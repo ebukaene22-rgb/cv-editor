@@ -1,0 +1,19 @@
+# Example footage.yaml — edit before each episode that uses real clips.
+# Episodes with NO real footage don't need this file.
+
+clips:
+  - source: "Getty Images licensed — La Liga broadcast"
+    duration_s: 3
+    purpose: "Nico Williams beating the full-back in transition — anchors the Instinct:9 claim"
+    on_screen_text: true
+    voiceover: true
+
+  - source: "Getty Images licensed — Spain national team"
+    duration_s: 4
+    purpose: "Off-ball movement pulling the right-back — anchors the Gravity:8 claim"
+    on_screen_text: true
+    voiceover: true
+
+# Total footage: 7s / 50s = 14% — well within the 30% hard limit.
+# Both clips: Getty licensed (LOW risk), transformative (text + VO), under 6s each.
+# Expected verdict: SAFE TO RENDER.
