@@ -1,0 +1,7 @@
+node_modules/
+remotion/node_modules/
+episodes/*/episode.mp4
+episodes/*/vo.mp3
+episodes/*/vo_timestamps.json
+.env
+*.local
