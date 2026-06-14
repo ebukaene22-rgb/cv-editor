@@ -6,6 +6,7 @@ import { ScriptAxes, ScriptScores } from "../types";
 interface Props {
   scores: ScriptScores;
   axes?: ScriptAxes;
+  evidence: string;      // spoken narration for this beat (15-30s)
   durationFrames: number;
 }
 
@@ -17,6 +18,8 @@ const FALLBACK: ScriptAxes = {
 };
 
 export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) => {
+  // `evidence` prop is spoken by voiceover — on screen the exhibits carry
+  // the same information in dossier form so both channels reinforce each other.
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -63,6 +66,7 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) 
         >
           The Evidence
         </span>
+        {/* "Evidence" is the section label in V3 — framework is supporting proof */}
         <span style={{ fontFamily: FONTS.mono, fontSize: 20, color: COLORS.textDim, letterSpacing: 3 }}>
           3-AXIS SCAN
         </span>

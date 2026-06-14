@@ -25,6 +25,11 @@ export const W = 1080;
 export const H = 1920;
 export const FPS = 30;
 
-// Beat timing in seconds — mirrors structure-beats.md
-export const BEAT_START = { hook: 0, profile: 10, verdict: 25, loop: 40 };
+// Beat timing in seconds — V3 story-first structure.
+// claim (0-5): prosecutor's opening sentence
+// tension (5-15): why the popular take is wrong
+// evidence (15-30): framework scores as supporting exhibits
+// reveal (30-40): transferability + consequence
+// loop (40-50): polarising comment trigger
+export const BEAT_START = { claim: 0, tension: 5, evidence: 15, reveal: 30, loop: 40 };
 export const DURATION_S = 50;

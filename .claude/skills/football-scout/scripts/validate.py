@@ -11,9 +11,25 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 BANNED_FILE = HERE.parent / "references" / "banned-words.txt"
-REQUIRED_BEATS = ["hook", "profile", "verdict", "loop"]
-WORD_MIN, WORD_MAX = 120, 140
+
+# V3 five-beat structure.
+REQUIRED_BEATS = ["claim", "tension", "evidence", "reveal", "loop"]
 AXES = ["instinct", "iq", "gravity"]
+
+# Per-beat word count ranges at ~3 words/second.
+# claim:    0-5s   (~12-18 words)
+# tension:  5-15s  (~25-35 words)
+# evidence: 15-30s (~42-52 words)
+# reveal:   30-40s (~26-36 words)
+# loop:     40-50s (~12-20 words)
+BEAT_RANGES: dict[str, tuple[int, int]] = {
+    "claim":    (10, 20),
+    "tension":  (22, 38),
+    "evidence": (38, 55),
+    "reveal":   (22, 40),
+    "loop":     (10, 22),
+}
+WORD_MIN, WORD_MAX = 120, 160
 
 
 def load_banned():
@@ -26,7 +42,7 @@ def load_banned():
 
 
 def count_words(text: str) -> int:
-    # Hyphenated terms ("half-space", "sixty-one") count as one word, matching speech.
+    # Hyphenated terms ("half-space", "sixty-one") count as one word.
     return len(re.findall(r"[A-Za-z0-9][A-Za-z0-9'\-]*", text))
 
 
@@ -39,27 +55,37 @@ def validate(path: str) -> list[str]:
     errors = []
     data = json.loads(Path(path).read_text())
 
+    # ── Beat presence and per-beat word counts ────────────────────────────────
     beats = data.get("beats", {})
+    total_wc = 0
     for beat in REQUIRED_BEATS:
-        if not beats.get(beat, "").strip():
+        text = beats.get(beat, "").strip()
+        if not text:
             errors.append(f"missing or empty beat: '{beat}'")
+            continue
+        wc = count_words(text)
+        total_wc += wc
+        lo, hi = BEAT_RANGES[beat]
+        if not (lo <= wc <= hi):
+            errors.append(
+                f"beat '{beat}' word count {wc} outside {lo}-{hi} "
+                f"(~{(lo+hi)//2} target at 3 words/sec)"
+            )
 
-    # Word count across all beats, in declared order.
-    full_text = " ".join(beats.get(b, "") for b in REQUIRED_BEATS)
-    wc = count_words(full_text)
-    if not (WORD_MIN <= wc <= WORD_MAX):
-        errors.append(f"word_count {wc} outside {WORD_MIN}-{WORD_MAX}")
-    if data.get("word_count") != wc:
-        errors.append(f"declared word_count {data.get('word_count')} != actual {wc}")
+    # ── Total word count ──────────────────────────────────────────────────────
+    if not (WORD_MIN <= total_wc <= WORD_MAX):
+        errors.append(f"total word_count {total_wc} outside {WORD_MIN}-{WORD_MAX}")
+    if data.get("word_count") != total_wc:
+        errors.append(f"declared word_count {data.get('word_count')} != actual {total_wc}")
 
-    # Scores present and in range.
+    # ── Scores ────────────────────────────────────────────────────────────────
     scores = data.get("scores", {})
     for axis in AXES:
         v = scores.get(axis)
         if not isinstance(v, int) or not (1 <= v <= 10):
             errors.append(f"score '{axis}' must be int 1-10, got {v!r}")
 
-    # Transferability recomputed from scores + context_risk.
+    # ── Transferability formula check ─────────────────────────────────────────
     cr = data.get("context_risk")
     if not isinstance(cr, int) or not (0 <= cr <= 20):
         errors.append(f"context_risk must be int 0-20, got {cr!r}")
@@ -70,28 +96,29 @@ def validate(path: str) -> list[str]:
                 f"transferability {data.get('transferability')} != formula result {expected}"
             )
 
-    # Banned hype words (whole-word, case-insensitive).
+    # ── Banned hype words ─────────────────────────────────────────────────────
+    full_text = " ".join(beats.get(b, "") for b in REQUIRED_BEATS)
     banned = load_banned()
     lowered = full_text.lower()
     for w in banned:
         if re.search(rf"\b{re.escape(w)}\b", lowered):
             errors.append(f"banned hype word used: '{w}'")
 
-    # V2 verdict-first fields. The accusation drives the hook; the evidence
-    # makes each score feel earned rather than arbitrary.
+    # ── V3 verdict-first fields ───────────────────────────────────────────────
     vh = data.get("verdict_hook")
     if not isinstance(vh, str) or not vh.strip():
-        errors.append("missing 'verdict_hook' (the 0-2s accusation, e.g. 'TRANSFER TRAP?')")
+        errors.append("missing 'verdict_hook' (e.g. 'TRANSFER TRAP?')")
     elif not vh.strip().endswith("?"):
-        errors.append(f"'verdict_hook' should end with '?' to pose a question, got {vh!r}")
+        errors.append(f"'verdict_hook' must end with '?', got {vh!r}")
 
     vl = data.get("verdict_label")
     if not isinstance(vl, str) or not vl.strip():
-        errors.append("missing 'verdict_label' (the resolved verdict, e.g. 'SYSTEM-DEPENDENT WEAPON')")
+        errors.append("missing 'verdict_label' (e.g. 'SYSTEM-DEPENDENT WEAPON')")
 
+    # ── V3 axes evidence + benchmark ──────────────────────────────────────────
     axes = data.get("axes", {})
     if not isinstance(axes, dict):
-        errors.append("'axes' must be an object with instinct/iq/gravity evidence")
+        errors.append("'axes' must be an object with instinct/iq/gravity entries")
     else:
         for axis in AXES:
             a = axes.get(axis)
@@ -101,7 +128,14 @@ def validate(path: str) -> list[str]:
             if not str(a.get("evidence", "")).strip():
                 errors.append(f"axes.{axis}.evidence is empty")
             if not str(a.get("percentile", "")).strip():
-                errors.append(f"axes.{axis}.percentile is empty (benchmark, e.g. 'Top 5% in transition')")
+                errors.append(f"axes.{axis}.percentile is empty (e.g. 'Top 5% in transition')")
+
+    # ── V3 twitter thread (4 lines — planning artifact) ───────────────────────
+    thread = data.get("thread")
+    if thread is None:
+        errors.append("missing 'thread' array (4-tweet planning artifact)")
+    elif not isinstance(thread, list) or len(thread) != 4:
+        errors.append(f"'thread' must have exactly 4 items, got {len(thread) if isinstance(thread, list) else type(thread).__name__}")
 
     return errors
 

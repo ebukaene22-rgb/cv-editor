@@ -5,14 +5,14 @@ import { deriveVerdict } from "../verdict";
 
 interface Props {
   transferability: number;
-  verdict: string;
+  reveal: string;        // consequence sentence: "this survives a move. But not to Barcelona."
   verdictLabelText?: string;
   durationFrames: number;
 }
 
 export const VerdictScene: React.FC<Props> = ({
   transferability,
-  verdict,
+  reveal,
   verdictLabelText,
   durationFrames,
 }) => {
@@ -168,9 +168,9 @@ export const VerdictScene: React.FC<Props> = ({
       {/* Divider */}
       <div style={{ height: 1, background: COLORS.border, margin: "40px 0" }} />
 
-      {/* Verdict caption */}
+      {/* Consequence caption — "this survives. But not to Barcelona." */}
       <Caption
-        text={verdict}
+        text={reveal}
         startFrame={captionStart}
         endFrame={durationFrames - Math.round(fps * 0.3)}
       />

@@ -19,10 +19,12 @@ export interface ScriptAxes {
 }
 
 export interface ScriptBeats {
-  hook: string;
-  profile: string;
-  verdict: string;
-  loop: string;
+  // V3 story-first beats — five acts in order.
+  claim:    string;   // 0-5s:  one punchy sentence that poses the case
+  tension:  string;   // 5-15s: why the popular take is wrong
+  evidence: string;   // 15-30s: Instinct/IQ/Gravity as supporting exhibits
+  reveal:   string;   // 30-40s: transferability + consequence
+  loop:     string;   // 40-50s: polarising comment trigger
 }
 
 export type VideoFormat =
@@ -39,9 +41,12 @@ export interface ScriptData {
   transferability: number;
   beats: ScriptBeats;
   word_count: number;
-  // V2 verdict-first fields (optional; scenes fall back if absent).
-  verdict_hook?: string;   // the 0-2s accusation, e.g. "TRANSFER TRAP?"
-  verdict_label?: string;  // final verdict, e.g. "SYSTEM-DEPENDENT WEAPON"
+  verdict_hook?: string;   // accusation stamp, e.g. "TRANSFER TRAP?" (thumbnail hero)
+  verdict_label?: string;  // resolved verdict, e.g. "SYSTEM-DEPENDENT WEAPON"
   axes?: ScriptAxes;       // per-axis evidence + benchmark
+  image_query?: string;    // Wikipedia search hint for automated player image fetch
   player_image_key?: string;
+  // V3: planning artifact — four tweet-style lines before converting to video.
+  // [hook_tweet, tension_tweet, evidence_tweet, resolution_tweet]
+  thread?: string[];
 }
