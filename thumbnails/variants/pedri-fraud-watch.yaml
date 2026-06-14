@@ -1,0 +1,13 @@
+player_name: "PEDRI"
+variant: fraud_watch
+instinct: 7
+iq: 6
+gravity: 5
+transferability: 42
+verdict_label: "FRAUD WATCH?"
+verdict_color: red
+player_image_path: "assets/players/pedri.png"
+player_image_position: right
+player_image_scale: 1.0
+player_image_opacity: 1.0
+player_image_rotation: 0

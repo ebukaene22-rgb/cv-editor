@@ -2,7 +2,7 @@
 # Feed to pipeline/generate_thumbnail.py → renders via Remotion ThumbnailComposition.
 
 # --- REQUIRED ---
-player_name: "PEDRI"            # Uppercase. Fills top of frame.
+player_name: "PEDRI"            # Uppercase. Fills dominant text area.
 variant: fraud_watch            # fraud_watch | system_product | outlier | transfer_trap
 
 # --- SCORES (required) ---
@@ -11,14 +11,20 @@ iq: 6
 gravity: 5
 transferability: 42             # integer 0-100
 
-# --- VARIANT-SPECIFIC (optional, variant determines defaults) ---
-verdict_label: "FRAUD WATCH?"   # Override the stamp text if needed
-verdict_color: red              # red | green. red=negative, green=positive
+# --- PLAYER IMAGE (optional but strongly recommended) ---
+# Place PNGs in assets/players/. Transparent cutout PNGs produce the best result.
+# If path doesn't exist, a placeholder silhouette is used automatically.
+player_image_path: "assets/players/pedri.png"
+player_image_position: right    # right | left | centre | behind_text
+player_image_scale: 1.0         # 0.5–2.0
+player_image_opacity: 1.0       # 0.0–1.0
+player_image_rotation: 0        # degrees, e.g. -5 for slight lean
 
-# --- TRANSFER TRAP only ---
-# transfer_club: "ARSENAL"      # Shown as "[PLAYER] TO [CLUB]?"
+# --- VERDICT ---
+verdict_label: "FRAUD WATCH?"   # Override stamp text if needed
+verdict_color: red              # red | green
 
-# --- OPTIONAL OVERRIDES ---
-# subtitle: "La Liga 2025-26"
-# collapse_risk: "HIGH"         # Shows warning label (system_product variant)
-# stamp_angle: -15              # Degrees. Default -15.
+# --- VARIANT-SPECIFIC ---
+# transfer_club: "ARSENAL"      # transfer_trap only — shown as "[PLAYER] TO [CLUB]?"
+# collapse_risk: "HIGH"         # system_product only
+# subtitle: "La Liga 2025-26"   # optional extra line

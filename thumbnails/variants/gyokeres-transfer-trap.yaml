@@ -1,0 +1,14 @@
+player_name: "GYOKERES"
+variant: transfer_trap
+instinct: 8
+iq: 6
+gravity: 7
+transferability: 58
+verdict_label: "TRANSFER TRAP"
+verdict_color: red
+transfer_club: "ARSENAL"
+player_image_path: "assets/players/gyokeres.png"
+player_image_position: left
+player_image_scale: 1.0
+player_image_opacity: 1.0
+player_image_rotation: 0

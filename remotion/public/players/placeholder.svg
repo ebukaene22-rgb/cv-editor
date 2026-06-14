@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 600" fill="rgba(255,255,255,0.18)">
+  <!-- Head -->
+  <ellipse cx="150" cy="68" rx="48" ry="52"/>
+  <!-- Neck -->
+  <rect x="132" y="112" width="36" height="28" rx="8"/>
+  <!-- Torso -->
+  <path d="M80 140 Q150 128 220 140 L235 310 L170 310 L150 250 L130 310 L65 310 Z"/>
+  <!-- Left arm -->
+  <path d="M80 145 L38 270 Q32 285 42 292 L58 298 Q68 302 74 288 L108 175 Z"/>
+  <!-- Right arm -->
+  <path d="M220 145 L262 270 Q268 285 258 292 L242 298 Q232 302 226 288 L192 175 Z"/>
+  <!-- Left thigh -->
+  <path d="M65 308 L60 430 Q58 445 72 448 L100 448 Q114 445 112 430 L118 308 Z"/>
+  <!-- Right thigh -->
+  <path d="M182 308 L188 430 Q190 445 200 448 L228 448 Q240 445 240 430 L235 308 Z"/>
+  <!-- Left shin + foot -->
+  <path d="M60 430 L52 545 Q50 560 64 562 L96 562 Q108 560 110 545 L112 430 Z"/>
+  <ellipse cx="72" cy="562" rx="28" ry="14" transform="rotate(-8 72 562)"/>
+  <!-- Right shin + foot -->
+  <path d="M190 430 L192 545 Q192 560 204 562 L236 562 Q248 560 248 545 L240 430 Z"/>
+  <ellipse cx="230" cy="562" rx="28" ry="14" transform="rotate(8 230 562)"/>
+</svg>
