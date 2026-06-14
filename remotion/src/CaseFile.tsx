@@ -50,6 +50,9 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
         <HookScene
           player={props.player}
           hook={props.beats.hook}
+          transferability={props.transferability}
+          verdictHook={props.verdict_hook}
+          verdictLabel={props.verdict_label}
           durationFrames={beats.hook.dur}
         />
       </Sequence>
@@ -57,7 +60,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
       <Sequence from={beats.profile.from} durationInFrames={beats.profile.dur} name="Profile">
         <ProfileScene
           scores={props.scores}
-          profile={props.beats.profile}
+          axes={props.axes}
           durationFrames={beats.profile.dur}
         />
       </Sequence>
@@ -66,6 +69,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
         <VerdictScene
           transferability={props.transferability}
           verdict={props.beats.verdict}
+          verdictLabelText={props.verdict_label}
           durationFrames={beats.verdict.dur}
         />
       </Sequence>

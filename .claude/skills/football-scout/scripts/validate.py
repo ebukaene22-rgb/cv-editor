@@ -77,6 +77,32 @@ def validate(path: str) -> list[str]:
         if re.search(rf"\b{re.escape(w)}\b", lowered):
             errors.append(f"banned hype word used: '{w}'")
 
+    # V2 verdict-first fields. The accusation drives the hook; the evidence
+    # makes each score feel earned rather than arbitrary.
+    vh = data.get("verdict_hook")
+    if not isinstance(vh, str) or not vh.strip():
+        errors.append("missing 'verdict_hook' (the 0-2s accusation, e.g. 'TRANSFER TRAP?')")
+    elif not vh.strip().endswith("?"):
+        errors.append(f"'verdict_hook' should end with '?' to pose a question, got {vh!r}")
+
+    vl = data.get("verdict_label")
+    if not isinstance(vl, str) or not vl.strip():
+        errors.append("missing 'verdict_label' (the resolved verdict, e.g. 'SYSTEM-DEPENDENT WEAPON')")
+
+    axes = data.get("axes", {})
+    if not isinstance(axes, dict):
+        errors.append("'axes' must be an object with instinct/iq/gravity evidence")
+    else:
+        for axis in AXES:
+            a = axes.get(axis)
+            if not isinstance(a, dict):
+                errors.append(f"axes.{axis} missing (needs 'evidence' + 'percentile')")
+                continue
+            if not str(a.get("evidence", "")).strip():
+                errors.append(f"axes.{axis}.evidence is empty")
+            if not str(a.get("percentile", "")).strip():
+                errors.append(f"axes.{axis}.percentile is empty (benchmark, e.g. 'Top 5% in transition')")
+
     return errors
 
 

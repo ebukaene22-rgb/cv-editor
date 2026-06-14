@@ -2,12 +2,19 @@
 
 Every script is four beats, in order. Word budgets keep total at 120–140.
 
+**Verdict-first principle:** the on-screen hero at 0–2s is the `verdict_hook`
+accusation (e.g. `TRANSFER TRAP?`). The spoken `hook` beat then states the
+unpopular thesis. The viewer must feel a conflict before any score appears.
+
 ## 1. hook [0–10s] — ~20–28 words
-Reject the mainstream take. Open the case file. Introduce ONE tactical friction point.
+The accusation slams on screen (`verdict_hook`); the narration rejects the
+mainstream take and names ONE tactical friction point — the unpopular thesis.
 - Pattern: "Forget [vanity stat]. Everyone calls [player] [mainstream label]. The tape opens a colder case."
 
 ## 2. profile [10–25s] — ~42–52 words
-The three scores, each with a single evidence line. Cold, declarative.
+The three scores enter as EXHIBITS — each with an on-screen evidence line
+(`axes.*.evidence`) and a benchmark chip (`axes.*.percentile`) that answers
+"says who?". Narration is cold and declarative.
 - Pattern: "Instinct: [n]. [evidence]. Football IQ: [n]. [evidence]. Gravity: [n]. [evidence]."
 
 ## 3. verdict [25–40s] — ~36–44 words

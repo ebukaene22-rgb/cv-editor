@@ -38,10 +38,34 @@ Always emit a `script.json` object (see `episodes/*/script.json` for shape):
   "scores": { "instinct": 0, "iq": 0, "gravity": 0 },
   "context_risk": 0,
   "transferability": 0,
+  "verdict_hook": "TRANSFER TRAP?",
+  "verdict_label": "SYSTEM-DEPENDENT WEAPON",
+  "axes": {
+    "instinct": { "evidence": "one cold sentence", "percentile": "Top 5% in transition" },
+    "iq":       { "evidence": "one cold sentence", "percentile": "Bottom 40% in possession" },
+    "gravity":  { "evidence": "one cold sentence", "percentile": "Top 10% off-ball pull" }
+  },
   "beats": { "hook": "...", "profile": "...", "verdict": "...", "loop": "..." },
   "word_count": 0
 }
 ```
+
+**The verdict is the hook; the framework is the evidence.** Lead with a charge,
+then prove it:
+
+- `verdict_hook` — a 2-word accusation ending in `?` shown on screen at 0–2s.
+  Vocabulary: `FRAUD WATCH?`, `SYSTEM PRODUCT?`, `TRANSFER TRAP?`, `OUTLIER?`,
+  `OVERHYPED?`, `VERIFIED?`. This is the thumbnail/video hero — pick the charge
+  the scores will defend.
+- `verdict_label` — the resolved verdict revealed at 25–40s (e.g.
+  `SYSTEM-DEPENDENT WEAPON`, `SYSTEM-INDEPENDENT OUTLIER`).
+- `axes.*.evidence` — the single coldest on-screen line justifying each score.
+- `axes.*.percentile` — a benchmark that makes the score feel earned, not
+  arbitrary (`Top 5% in transition`, `Bottom 40% in possession`). Answer the
+  viewer's "says who?".
+
+The `beats` are the spoken narration (TTS reads these); `axes` are the on-screen
+exhibits. They should agree but need not be identical wording.
 
 After writing it, run `python .claude/skills/football-scout/scripts/validate.py <path>`
 and fix anything it flags before presenting.

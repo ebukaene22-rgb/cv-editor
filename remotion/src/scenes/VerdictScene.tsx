@@ -1,22 +1,27 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption";
 import { COLORS, FONTS } from "../theme";
+import { deriveVerdict } from "../verdict";
 
 interface Props {
   transferability: number;
   verdict: string;
+  verdictLabelText?: string;
   durationFrames: number;
 }
 
-const isOutlier = (t: number) => t >= 75;
-
-export const VerdictScene: React.FC<Props> = ({ transferability, verdict, durationFrames }) => {
+export const VerdictScene: React.FC<Props> = ({
+  transferability,
+  verdict,
+  verdictLabelText,
+  durationFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const outlier = isOutlier(transferability);
-  const verdictColor = outlier ? "#22c55e" : COLORS.accent;
-  const verdictLabel = outlier ? "SYSTEM-INDEPENDENT OUTLIER" : "SYSTEM PRODUCT — AT RISK";
+  const v = deriveVerdict(transferability, undefined, verdictLabelText);
+  const verdictColor = v.color;
+  const verdictLabel = v.label;
 
   const labelOpacity = interpolate(frame, [0, fps * 0.35], [0, 1], {
     extrapolateRight: "clamp",

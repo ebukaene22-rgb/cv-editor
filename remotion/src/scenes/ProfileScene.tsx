@@ -1,27 +1,35 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caption } from "../components/Caption";
-import { ScoreBar } from "../components/ScoreBar";
+import { EvidenceRow } from "../components/EvidenceRow";
 import { COLORS, FONTS } from "../theme";
-import { ScriptScores } from "../types";
+import { ScriptAxes, ScriptScores } from "../types";
 
 interface Props {
   scores: ScriptScores;
-  profile: string;
+  axes?: ScriptAxes;
   durationFrames: number;
 }
 
-export const ProfileScene: React.FC<Props> = ({ scores, profile, durationFrames }) => {
+// Fallback evidence if a script predates the V2 `axes` field.
+const FALLBACK: ScriptAxes = {
+  instinct: { evidence: "Reads danger before it forms.", percentile: "ELITE TRAIT" },
+  iq: { evidence: "Solves moments, not structures.", percentile: "ROLE-DEPENDENT" },
+  gravity: { evidence: "Defenders react before he touches it.", percentile: "HIGH PULL" },
+};
+
+export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+
+  const ev = axes ?? FALLBACK;
 
   const headerOpacity = interpolate(frame, [0, fps * 0.3], [0, 1], {
     extrapolateRight: "clamp",
   });
 
-  // Stagger score bars by 0.6s each
-  const instinctStart = Math.round(fps * 0.3);
-  const iqStart = Math.round(fps * 0.9);
-  const gravityStart = Math.round(fps * 1.5);
+  // Each exhibit enters ~1.5s after the last — evidence stacking up.
+  const aStart = Math.round(fps * 0.4);
+  const bStart = Math.round(fps * 1.9);
+  const cStart = Math.round(fps * 3.4);
 
   return (
     <AbsoluteFill
@@ -29,63 +37,67 @@ export const ProfileScene: React.FC<Props> = ({ scores, profile, durationFrames 
         background: COLORS.bg,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
-        padding: "120px 60px 100px",
+        padding: "90px 60px",
       }}
     >
       {/* Header */}
       <div
         style={{
           opacity: headerOpacity,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
           borderBottom: `1px solid ${COLORS.border}`,
-          paddingBottom: 32,
-          marginBottom: 60,
+          paddingBottom: 24,
+          marginBottom: 48,
         }}
       >
         <span
           style={{
             fontFamily: FONTS.mono,
-            fontSize: 24,
+            fontSize: 26,
             color: COLORS.accent,
             letterSpacing: 6,
             textTransform: "uppercase",
           }}
         >
-          Cognitive Profile
+          The Evidence
+        </span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 20, color: COLORS.textDim, letterSpacing: 3 }}>
+          3-AXIS SCAN
         </span>
       </div>
 
-      {/* Score bars — staggered */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 60 }}>
-        <ScoreBar
+      {/* Evidence stack */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 56 }}>
+        <EvidenceRow
+          exhibit="A"
           label="Instinct"
           score={scores.instinct}
-          startFrame={instinctStart}
+          evidence={ev.instinct.evidence}
+          percentile={ev.instinct.percentile}
+          startFrame={aStart}
           color={COLORS.scoreBar}
         />
-        <ScoreBar
+        <EvidenceRow
+          exhibit="B"
           label="Football IQ"
           score={scores.iq}
-          startFrame={iqStart}
+          evidence={ev.iq.evidence}
+          percentile={ev.iq.percentile}
+          startFrame={bStart}
           color={COLORS.scoreBar}
         />
-        <ScoreBar
+        <EvidenceRow
+          exhibit="C"
           label="Gravity"
           score={scores.gravity}
-          startFrame={gravityStart}
+          evidence={ev.gravity.evidence}
+          percentile={ev.gravity.percentile}
+          startFrame={cStart}
           color={COLORS.gravity}
         />
       </div>
-
-      {/* Divider */}
-      <div style={{ height: 1, background: COLORS.border, margin: "40px 0" }} />
-
-      {/* Profile caption */}
-      <Caption
-        text={profile}
-        startFrame={gravityStart + Math.round(fps * 0.8)}
-        endFrame={durationFrames - Math.round(fps * 0.3)}
-      />
     </AbsoluteFill>
   );
 };

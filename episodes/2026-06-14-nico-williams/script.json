@@ -4,6 +4,22 @@
   "scores": { "instinct": 9, "iq": 6, "gravity": 8 },
   "context_risk": 13,
   "transferability": 61,
+  "verdict_hook": "TRANSFER TRAP?",
+  "verdict_label": "SYSTEM-DEPENDENT WEAPON",
+  "axes": {
+    "instinct": {
+      "evidence": "First step fires before the defender's brain registers danger.",
+      "percentile": "Top 5% in transition"
+    },
+    "iq": {
+      "evidence": "Hesitates in low blocks. Takes the wrong half-space.",
+      "percentile": "Bottom 40% in possession"
+    },
+    "gravity": {
+      "evidence": "Defenders collapse toward him, bending the backline.",
+      "percentile": "Top 10% off-ball pull"
+    }
+  },
   "beats": {
     "hook": "Forget his dribble count. Everyone calls Nico Williams a finished product. The tape opens a colder case. There's a fault line nobody scouts.",
     "profile": "Instinct: nine. In transition, his first step fires before the defender's brain registers danger. Football IQ: a flat six. In structured low blocks he hesitates, takes the wrong half-space, kills his own overload. Gravity: eight. Defenders collapse toward him, bending the backline and freeing the weak side.",

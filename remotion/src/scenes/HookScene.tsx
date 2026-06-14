@@ -1,27 +1,52 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption";
-import { CaseFileStamp } from "../components/CaseFileStamp";
-import { COLORS, FONTS, FPS } from "../theme";
+import { COLORS, FONTS } from "../theme";
+import { deriveVerdict } from "../verdict";
 
 interface Props {
   player: string;
   hook: string;
+  transferability: number;
+  verdictHook?: string;
+  verdictLabel?: string;
   durationFrames: number;
 }
 
-export const HookScene: React.FC<Props> = ({ player, hook, durationFrames }) => {
+// V2: the VERDICT is the hook. The accusation slams in at frame 0 — no slow
+// build — then the player name, the transferability teaser, and the thesis.
+export const HookScene: React.FC<Props> = ({
+  player,
+  hook,
+  transferability,
+  verdictHook,
+  verdictLabel,
+  durationFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const playerOpacity = interpolate(frame, [0, fps * 0.4], [0, 1], {
+  const verdict = deriveVerdict(transferability, verdictHook, verdictLabel);
+
+  // Accusation slams in hard at frame 0 — overshoot scale + settle.
+  const stampScale = interpolate(frame, [0, 3, 7], [1.4, 0.97, 1], {
     extrapolateRight: "clamp",
   });
-  const playerY = interpolate(frame, [0, fps * 0.4], [-20, 0], {
+  const stampOpacity = interpolate(frame, [0, 2], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+  // Camera-shake on the slam: a couple of frames of jitter then dead still.
+  const shake = frame < 6 ? Math.sin(frame * 8) * (6 - frame) : 0;
+
+  // Player name + chips fade in just after the slam.
+  const metaOpacity = interpolate(frame, [6, fps * 0.5], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+  const metaY = interpolate(frame, [6, fps * 0.5], [16, 0], {
     extrapolateRight: "clamp",
   });
 
-  // Scan-line flicker effect on entry
-  const scanOpacity = interpolate(frame, [0, 4, 8, 12, 16], [0, 0.15, 0, 0.08, 0], {
+  // Scan-line flicker on entry.
+  const scanOpacity = interpolate(frame, [0, 4, 8, 12, 16], [0, 0.18, 0, 0.08, 0], {
     extrapolateRight: "clamp",
   });
 
@@ -32,85 +57,106 @@ export const HookScene: React.FC<Props> = ({ player, hook, durationFrames }) => 
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        padding: "120px 60px 100px",
+        padding: "90px 60px 90px",
       }}
     >
-      {/* Top: file header bar */}
+      {/* File header strip */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: FONTS.mono,
+          fontSize: 22,
+          color: COLORS.textDim,
+          letterSpacing: 4,
+        }}
+      >
+        <span>FILE #IQ-001</span>
+        <span>CLASSIFIED</span>
+      </div>
+
+      {/* HERO: the accusation */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 16,
-          borderBottom: `1px solid ${COLORS.border}`,
-          paddingBottom: 40,
+          alignItems: "center",
+          gap: 36,
+          transform: `translateX(${shake}px)`,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div
+          style={{
+            opacity: stampOpacity,
+            transform: `scale(${stampScale}) rotate(-4deg)`,
+            border: `8px solid ${verdict.color}`,
+            padding: "24px 48px",
+            background: "rgba(0,0,0,0.4)",
+          }}
+        >
           <span
             style={{
-              fontFamily: FONTS.mono,
-              fontSize: 22,
-              color: COLORS.textDim,
-              letterSpacing: 4,
+              fontFamily: FONTS.sans,
+              fontSize: 130,
+              fontWeight: "bold",
+              color: verdict.color,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              lineHeight: 0.95,
+              display: "block",
+              textAlign: "center",
             }}
           >
-            FILE #IQ-001
-          </span>
-          <span
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 22,
-              color: COLORS.textDim,
-              letterSpacing: 4,
-            }}
-          >
-            CLASSIFIED
+            {verdict.hook}
           </span>
         </div>
 
+        {/* Player name */}
         <div
           style={{
-            opacity: playerOpacity,
-            transform: `translateY(${playerY}px)`,
+            opacity: metaOpacity,
+            transform: `translateY(${metaY}px)`,
             fontFamily: FONTS.mono,
-            fontSize: 88,
+            fontSize: 76,
             fontWeight: "bold",
             color: COLORS.text,
-            lineHeight: 1,
             textTransform: "uppercase",
-            letterSpacing: -1,
+            letterSpacing: 1,
+            textAlign: "center",
+            lineHeight: 1,
           }}
         >
           {player}
         </div>
 
-        <div style={{ marginTop: 8 }}>
-          <CaseFileStamp startFrame={fps * 0.5} />
+        {/* Transferability teaser chip */}
+        <div
+          style={{
+            opacity: metaOpacity,
+            transform: `translateY(${metaY}px)`,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 16,
+            border: `1px solid ${COLORS.border}`,
+            padding: "12px 28px",
+            fontFamily: FONTS.mono,
+          }}
+        >
+          <span style={{ fontSize: 24, color: COLORS.textMuted, letterSpacing: 4 }}>
+            TRANSFERABILITY
+          </span>
+          <span style={{ fontSize: 44, fontWeight: "bold", color: verdict.color }}>
+            {transferability}%
+          </span>
         </div>
       </div>
 
-      {/* Middle: redacted dossier lines (visual texture) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1, paddingTop: 60 }}>
-        {[1, 0.3, 0.7, 0.2, 0.5].map((opacity, i) => (
-          <div
-            key={i}
-            style={{
-              height: 16,
-              borderRadius: 3,
-              background: COLORS.border,
-              opacity,
-              width: `${[85, 60, 78, 45, 92][i]}%`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Bottom: hook caption */}
-      <div style={{ paddingTop: 40 }}>
+      {/* Thesis caption */}
+      <div>
         <Caption
           text={hook}
-          startFrame={fps * 1}
-          endFrame={durationFrames - fps * 0.5}
+          startFrame={Math.round(fps * 0.8)}
+          endFrame={durationFrames - Math.round(fps * 0.4)}
         />
       </div>
 
