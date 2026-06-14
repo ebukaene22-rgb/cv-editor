@@ -2,18 +2,25 @@
 """Generate A/B thumbnail pair from a variant YAML config.
 
 Usage:
+  # With a pre-existing transparent PNG cutout:
   python thumbnails/generate_thumbnail.py thumbnails/variants/pedri-fraud-watch.yaml
 
-Outputs per episode:
-  thumbnails/output/<stem>_with_cutout.png
-  thumbnails/output/<stem>_no_cutout.png
+  # With a raw player photo — remove.bg removes the background automatically:
+  REMOVEBG_API_KEY=your_key python thumbnails/generate_thumbnail.py \\
+    thumbnails/variants/pedri-fraud-watch.yaml \\
+    --source-image downloads/pedri_photo.jpg
 
-Player images:
-  - Place transparent PNG cutouts in assets/players/<name>.png
-  - If the file doesn't exist, the placeholder silhouette is used automatically.
-  - Images are copied to remotion/public/players/ before rendering (Remotion needs them there).
+Outputs:
+  thumbnails/output/<stem>_with_cutout.png   — player image visible
+  thumbnails/output/<stem>_no_cutout.png     — text-only layout (A/B test)
+
+Player image resolution:
+  1. --source-image flag (auto-removes bg via remove.bg API)
+  2. player_image_path in config (must already be a transparent PNG)
+  3. Placeholder SVG silhouette (fallback, always works)
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -38,6 +45,8 @@ REQUIRED = ["player_name", "variant", "instinct", "iq", "gravity", "transferabil
 VALID_VARIANTS = list(VARIANT_DEFAULTS.keys())
 
 
+# ── Validation ────────────────────────────────────────────────────────────────
+
 def validate(cfg: dict) -> list[str]:
     errors = []
     for f in REQUIRED:
@@ -55,25 +64,72 @@ def validate(cfg: dict) -> list[str]:
     return errors
 
 
-def stage_player_image(image_path_str: str | None) -> str | None:
-    """Copy image to remotion/public/players/ and return the public key, or None."""
-    if not image_path_str:
-        return None
+# ── Image handling ────────────────────────────────────────────────────────────
 
-    src = REPO / image_path_str
-    if not src.exists():
-        print(f"  ⚠ Player image not found: {src}")
-        print(f"    Falling back to placeholder silhouette.")
-        return None
+def auto_remove_bg(source: Path, output: Path) -> bool:
+    """Call pipeline/removebg.py to strip background. Returns True on success."""
+    api_key = os.environ.get("REMOVEBG_API_KEY")
+    if not api_key:
+        print("  ⚠ REMOVEBG_API_KEY not set — skipping background removal.")
+        print("    Get a free key at remove.bg/api")
+        return False
 
+    removebg_script = REPO / "pipeline" / "removebg.py"
+    result = subprocess.run(
+        [sys.executable, str(removebg_script), str(source), str(output)],
+        cwd=REPO,
+    )
+    return result.returncode == 0
+
+
+def resolve_player_image(cfg: dict, source_image: Path | None) -> Path | None:
+    """
+    Returns path to a ready-to-use transparent PNG, or None (triggers placeholder).
+
+    Priority:
+      1. --source-image CLI flag → run remove.bg → save to assets/players/
+      2. player_image_path in config → use as-is if it exists
+      3. None → placeholder
+    """
+    player_slug = cfg["player_name"].lower().replace(" ", "_")
+    cutout_dest = REPO / "assets" / "players" / f"{player_slug}.png"
+
+    if source_image:
+        if not source_image.exists():
+            print(f"  ✗ Source image not found: {source_image}")
+            return None
+        print(f"\n── Background removal: {source_image.name} ──")
+        cutout_dest.parent.mkdir(parents=True, exist_ok=True)
+        if auto_remove_bg(source_image, cutout_dest):
+            return cutout_dest
+        else:
+            print("  Falling back to placeholder.")
+            return None
+
+    # No source image — check config path
+    config_path = cfg.get("player_image_path")
+    if config_path:
+        p = REPO / config_path
+        if p.exists():
+            return p
+        print(f"  ⚠ player_image_path not found: {p}")
+        print(f"    Run with --source-image to auto-generate the cutout.")
+
+    return None
+
+
+def stage_image(image_path: Path) -> str:
+    """Copy image to remotion/public/players/ and return the public key."""
     PUBLIC_PLAYERS.mkdir(parents=True, exist_ok=True)
-    dest = PUBLIC_PLAYERS / src.name
-    shutil.copy2(src, dest)
-    print(f"  Staged player image → remotion/public/players/{src.name}")
-    return f"players/{src.name}"
+    dest = PUBLIC_PLAYERS / image_path.name
+    shutil.copy2(image_path, dest)
+    print(f"  Staged → remotion/public/players/{image_path.name}")
+    return f"players/{image_path.name}"
 
 
-def build_props(cfg: dict, player_image_key: str | None) -> dict:
+# ── Props builder ─────────────────────────────────────────────────────────────
+
+def build_props(cfg: dict, player_image_key: str | None, show_image: bool) -> dict:
     variant = cfg["variant"]
     defaults = VARIANT_DEFAULTS[variant]
 
@@ -82,8 +138,8 @@ def build_props(cfg: dict, player_image_key: str | None) -> dict:
         "variant": variant,
         "scores": {
             "instinct": int(cfg["instinct"]),
-            "iq": int(cfg["iq"]),
-            "gravity": int(cfg["gravity"]),
+            "iq":       int(cfg["iq"]),
+            "gravity":  int(cfg["gravity"]),
         },
         "transferability": int(cfg["transferability"]),
         "verdict_label": cfg.get("verdict_label", defaults["verdict_label"]),
@@ -97,22 +153,28 @@ def build_props(cfg: dict, player_image_key: str | None) -> dict:
     if "subtitle" in cfg:
         props["subtitle"] = cfg["subtitle"]
 
-    if player_image_key:
-        props["player_image_key"] = player_image_key
-        props["player_image_position"] = cfg.get("player_image_position", "right")
-        props["player_image_scale"] = float(cfg.get("player_image_scale", 1.0))
+    position = cfg.get("player_image_position", "right")
+    props["player_image_position"] = position
+    props["player_image_scale"]    = float(cfg.get("player_image_scale", 1.0))
+    props["player_image_rotation"] = float(cfg.get("player_image_rotation", 0))
+
+    if show_image and player_image_key:
+        # Real cutout — full opacity
+        props["player_image_key"]     = player_image_key
         props["player_image_opacity"] = float(cfg.get("player_image_opacity", 1.0))
-        props["player_image_rotation"] = float(cfg.get("player_image_rotation", 0))
-    else:
-        # No cutout: use placeholder with lower opacity so it reads as a ghost silhouette
-        props["player_image_key"] = PLACEHOLDER_KEY
-        props["player_image_position"] = cfg.get("player_image_position", "right")
-        props["player_image_scale"] = 1.0
+    elif show_image:
+        # No cutout available — ghost placeholder so layout is still visible
+        props["player_image_key"]     = PLACEHOLDER_KEY
         props["player_image_opacity"] = 0.12
-        props["player_image_rotation"] = 0
+    else:
+        # No-cutout A/B variant — completely hide image
+        props["player_image_key"]     = PLACEHOLDER_KEY
+        props["player_image_opacity"] = 0.0
 
     return props
 
+
+# ── Renderer ──────────────────────────────────────────────────────────────────
 
 def render(props: dict, output_path: Path, label: str) -> bool:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -125,19 +187,24 @@ def render(props: dict, output_path: Path, label: str) -> bool:
         "--frame=0",
         "--log=error",
     ]
-    print(f"\n  Rendering {label}...")
-    result = subprocess.run(cmd, cwd=REMOTION_DIR)
+    print(f"\n  Rendering [{label}]...")
+    result = subprocess.run(cmd, cwd=REMOTION_DIR, capture_output=True, text=True)
     if result.returncode == 0:
-        print(f"  ✓ {output_path.name}")
+        size_kb = output_path.stat().st_size // 1024
+        print(f"  ✓ {output_path.name} ({size_kb}KB)")
         return True
     else:
         print(f"  ✗ FAILED: {label}")
+        if result.stderr:
+            print(result.stderr[-400:])
         return False
 
 
+# ── Main ──────────────────────────────────────────────────────────────────────
+
 def main():
     if len(sys.argv) < 2:
-        print("usage: generate_thumbnail.py <variant.yaml>")
+        print("usage: generate_thumbnail.py <variant.yaml> [--source-image <photo.jpg>]")
         sys.exit(2)
 
     config_path = Path(sys.argv[1])
@@ -150,33 +217,39 @@ def main():
             print(f"  - {e}")
         sys.exit(1)
 
+    source_image: Path | None = None
+    if "--source-image" in sys.argv:
+        idx = sys.argv.index("--source-image")
+        source_image = Path(sys.argv[idx + 1])
+
     stem = config_path.stem
-    print(f"\n── Thumbnail generator: {stem} ──")
+    print(f"\n══ Thumbnail generator: {stem} ══")
 
-    # Stage the real player image (copies to remotion/public/)
-    player_key = stage_player_image(cfg.get("player_image_path"))
+    # Resolve player image → optionally strip background
+    cutout_path = resolve_player_image(cfg, source_image)
+    player_key  = stage_image(cutout_path) if cutout_path else None
 
-    # A/B pair: with cutout and without
     results = []
 
-    # Version A: with real cutout (or placeholder at low opacity if image missing)
-    props_with = build_props(cfg, player_key)
-    out_with = OUTPUT_DIR / f"{stem}_with_cutout.png"
+    # A: with cutout (or ghost placeholder if no image)
+    props_with = build_props(cfg, player_key, show_image=True)
+    out_with   = OUTPUT_DIR / f"{stem}_with_cutout.png"
     results.append(render(props_with, out_with, "with_cutout"))
 
-    # Version B: text-only, no image layer
-    props_without = build_props(cfg, None)
-    props_without["player_image_opacity"] = 0.0  # fully hidden
-    out_without = OUTPUT_DIR / f"{stem}_no_cutout.png"
+    # B: text-only
+    props_without = build_props(cfg, player_key, show_image=False)
+    out_without   = OUTPUT_DIR / f"{stem}_no_cutout.png"
     results.append(render(props_without, out_without, "no_cutout"))
 
     if all(results):
+        had_real = "real cutout" if (cutout_path and cutout_path.name != "placeholder.svg") else "placeholder"
         print(f"""
-╔═══════════════════════════════════════════════════╗
-║  A/B THUMBNAILS READY                            ║
-║  {str(out_with.name):<47} ║
-║  {str(out_without.name):<47} ║
-╚═══════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════╗
+║  A/B THUMBNAILS READY  ({had_real:<26}) ║
+║                                                      ║
+║  {str(out_with.name):<50} ║
+║  {str(out_without.name):<50} ║
+╚══════════════════════════════════════════════════════╝
 """)
     else:
         sys.exit(1)
