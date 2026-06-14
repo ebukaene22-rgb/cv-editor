@@ -1,0 +1,16 @@
+{
+  "name": "cv-editor",
+  "version": "1.0.0",
+  "description": "A reproducible production pipeline for a faceless YouTube Shorts / TikTok channel that profiles footballers through a proprietary **3-Axis Framework** (Instinct · Football IQ · Gravity) in a cold, investigative \"case file\" voice.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:33715/git/ebukaene22-rgb/cv-editor"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
