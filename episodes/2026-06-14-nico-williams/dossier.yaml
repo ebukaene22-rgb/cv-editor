@@ -1,0 +1,27 @@
+# Player dossier — raw evidence the scout reasons over. Keep it factual; scores are derived.
+player: Nico Williams
+format: player-profile           # player-profile | player-comparison | team-top-transfers | player-best-moves
+position: Left winger
+mainstream_label: finished product
+vanity_stats_to_reject:
+  - dribble completion count
+  - highlight-reel goals
+
+phases:
+  transition: "Devastating first step; beats the defender's reaction window in open space."
+  low_block: "Hesitates against a parked bus; takes the wrong half-space, kills the overload."
+  off_ball: "Pulls the full-back inside; backline bends, weak-side space opens."
+
+evidence:
+  instinct: "Trigger fires before the defender registers danger in transition."
+  iq: "Positional decisions break down when the game is slow and structured."
+  gravity: "Defenders track him without the ball, distorting one full channel."
+
+# Context-risk factors (feed transferability.md). Mark true ones.
+context_risk_factors:
+  thrives_one_phase: true        # transition-only  (+5)
+  unproven_step_up: true         # bigger league/level (+4)
+  rare_role_in_target_leagues: false
+  relies_on_one_teammate: false
+  age_physical_threat: false
+# selected total context_risk -> 13 (editorial: transition dependence weighs heavier here)

@@ -1,0 +1,20 @@
+# Hype / filler words rejected by validate.py (case-insensitive, whole-word).
+# "elite" is intentionally NOT banned — it is a scoring band, not hype.
+amazing
+incredible
+unbelievable
+fantastic
+world-class
+generational
+insane
+goat
+wonderkid
+superstar
+baller
+magical
+phenomenal
+sensational
+beast
+monster
+crazy
+unreal
