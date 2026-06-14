@@ -76,6 +76,42 @@ jobs:
           python pipeline/tts.py \
             episodes/${{ steps.slug.outputs.slug }}/script.json
 
+      # Fully automated player image: fetch from Wikipedia, strip background.
+      # Skips if a cutout was already committed to assets/players/.
+      - name: Fetch & prepare player image
+        env:
+          REMOVEBG_API_KEY: ${{ secrets.REMOVEBG_API_KEY }}
+        run: |
+          SLUG=${{ steps.slug.outputs.slug }}
+          SCRIPT=episodes/$SLUG/script.json
+          PLAYER_SLUG=$(python3 -c "import json; d=json.load(open('$SCRIPT')); print(d['player'].lower().replace(' ','_'))")
+          PLAYER_NAME=$(python3 -c "import json; d=json.load(open('$SCRIPT')); print(d['player'])")
+          QUERY=$(python3 -c "import json; d=json.load(open('$SCRIPT')); print(d.get('image_query',''))")
+          CUTOUT=assets/players/$PLAYER_SLUG.png
+
+          if [ -f "$CUTOUT" ]; then
+            echo "Cutout already present: $CUTOUT — skipping fetch."
+            exit 0
+          fi
+
+          mkdir -p assets/players
+
+          # 1. Fetch raw photo from Wikipedia (pass --query only if set)
+          FETCH_ARGS=("$PLAYER_NAME" --out /tmp/raw_player.img)
+          if [ -n "$QUERY" ]; then FETCH_ARGS+=(--query "$QUERY"); fi
+
+          if python pipeline/fetch_player_image.py "${FETCH_ARGS[@]}"; then
+            # 2. Strip background via remove.bg -> transparent PNG
+            if python pipeline/removebg.py /tmp/raw_player.img "$CUTOUT"; then
+              echo "Cutout ready: $CUTOUT"
+            else
+              echo "remove.bg failed — using raw photo as fallback."
+              cp /tmp/raw_player.img "$CUTOUT"
+            fi
+          else
+            echo "No image found for $PLAYER_NAME — video will use placeholder."
+          fi
+
       - name: Render episode video (Remotion)
         run: |
           SLUG=${{ steps.slug.outputs.slug }}

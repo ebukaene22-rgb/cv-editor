@@ -6,6 +6,7 @@
   "transferability": 61,
   "verdict_hook": "TRANSFER TRAP?",
   "verdict_label": "SYSTEM-DEPENDENT WEAPON",
+  "image_query": "Nico Williams (footballer, born 2002)",
   "axes": {
     "instinct": {
       "evidence": "First step fires before the defender's brain registers danger.",
