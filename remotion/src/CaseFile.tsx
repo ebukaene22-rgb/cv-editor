@@ -1,6 +1,9 @@
 import {
   AbsoluteFill,
+  Audio,
+  Img,
   Sequence,
+  staticFile,
   useVideoConfig,
 } from "remotion";
 import { HookScene } from "./scenes/HookScene";
@@ -25,6 +28,24 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
 
   return (
     <AbsoluteFill>
+      <Audio src={staticFile("vo.mp3")} />
+
+      {props.player_image_key && (
+        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
+          <Img
+            src={staticFile(props.player_image_key)}
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              height: "65%",
+              opacity: 0.18,
+              mixBlendMode: "luminosity",
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
       <Sequence from={beats.hook.from} durationInFrames={beats.hook.dur} name="Hook">
         <HookScene
           player={props.player}

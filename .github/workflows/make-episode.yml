@@ -78,11 +78,26 @@ jobs:
 
       - name: Render episode video (Remotion)
         run: |
+          SLUG=${{ steps.slug.outputs.slug }}
+
+          # Stage voiceover so Remotion can load it via staticFile("vo.mp3")
+          cp episodes/$SLUG/vo.mp3 remotion/public/vo.mp3
+
+          # Stage player cutout if one exists, and inject its key into props
+          PLAYER=$(python3 -c "import json; d=json.load(open('episodes/$SLUG/script.json')); print(d['player'].lower().replace(' ','_'))")
+          PLAYER_IMG="assets/players/${PLAYER}.png"
+          PROPS=$(cat episodes/$SLUG/script.json)
+          if [ -f "$PLAYER_IMG" ]; then
+            mkdir -p remotion/public/players
+            cp "$PLAYER_IMG" remotion/public/players/${PLAYER}.png
+            PROPS=$(python3 -c "import json,sys; d=json.loads(sys.argv[1]); d['player_image_key']='players/${PLAYER}.png'; print(json.dumps(d))" "$PROPS")
+          fi
+
           cd remotion
           # swangle = software renderer, no GPU needed in CI
           npx remotion render src/index.ts CaseFile \
-            ../episodes/${{ steps.slug.outputs.slug }}/episode.mp4 \
-            --props="$(cat ../episodes/${{ steps.slug.outputs.slug }}/script.json)" \
+            ../episodes/$SLUG/episode.mp4 \
+            --props="$PROPS" \
             --gl=swangle \
             --log=verbose
 

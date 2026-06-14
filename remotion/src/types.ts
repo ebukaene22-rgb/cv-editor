@@ -25,4 +25,5 @@ export interface ScriptData {
   transferability: number;
   beats: ScriptBeats;
   word_count: number;
+  player_image_key?: string;
 }
