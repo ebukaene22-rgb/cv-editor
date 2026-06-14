@@ -1,0 +1,9 @@
+player_name: "WIRTZ"
+variant: system_product
+instinct: 8
+iq: 5
+gravity: 6
+transferability: 61
+verdict_label: "SYSTEM PRODUCT"
+verdict_color: red
+collapse_risk: "HIGH"

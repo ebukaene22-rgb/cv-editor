@@ -1,0 +1,8 @@
+player_name: "PEDRI"
+variant: fraud_watch
+instinct: 7
+iq: 6
+gravity: 5
+transferability: 42
+verdict_label: "FRAUD WATCH?"
+verdict_color: red

@@ -1,11 +1,10 @@
 import { Composition } from "remotion";
 import { CaseFile } from "./CaseFile";
+import { ThumbnailScene, ThumbnailProps } from "./scenes/ThumbnailScene";
 import { FPS, W, H, DURATION_S } from "./theme";
 import type { ScriptData } from "./types";
 
-// Default props pulled from the Nico Williams first-draft script — override
-// with --props at render time: remotion render ... --props='{"player": "..."}'
-const DEFAULT_PROPS: ScriptData = {
+const DEFAULT_CASEFILE_PROPS: ScriptData = {
   player: "Nico Williams",
   format: "player-profile",
   scores: { instinct: 9, iq: 6, gravity: 8 },
@@ -20,14 +19,34 @@ const DEFAULT_PROPS: ScriptData = {
   word_count: 129,
 };
 
+const DEFAULT_THUMBNAIL_PROPS: ThumbnailProps = {
+  player_name: "PEDRI",
+  variant: "fraud_watch",
+  scores: { instinct: 7, iq: 6, gravity: 5 },
+  transferability: 42,
+  verdict_label: "FRAUD WATCH?",
+  verdict_color: "red",
+};
+
 export const Root: React.FC = () => (
-  <Composition
-    id="CaseFile"
-    component={CaseFile as unknown as React.ComponentType<Record<string, unknown>>}
-    durationInFrames={DURATION_S * FPS}
-    fps={FPS}
-    width={W}
-    height={H}
-    defaultProps={DEFAULT_PROPS}
-  />
+  <>
+    <Composition
+      id="CaseFile"
+      component={CaseFile as unknown as React.ComponentType<Record<string, unknown>>}
+      durationInFrames={DURATION_S * FPS}
+      fps={FPS}
+      width={W}
+      height={H}
+      defaultProps={DEFAULT_CASEFILE_PROPS}
+    />
+    <Composition
+      id="Thumbnail"
+      component={ThumbnailScene as unknown as React.ComponentType<Record<string, unknown>>}
+      durationInFrames={1}
+      fps={FPS}
+      width={W}
+      height={H}
+      defaultProps={DEFAULT_THUMBNAIL_PROPS}
+    />
+  </>
 );
