@@ -1,0 +1,80 @@
+name: Make Thumbnail
+
+# Triggers when a thumbnail variant config is pushed, or manually.
+on:
+  push:
+    paths:
+      - "thumbnails/variants/*.yaml"
+      - "assets/players/*.png"
+      - "assets/players/*.jpg"
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Thumbnail config path (e.g. thumbnails/variants/pedri-fraud-watch.yaml)"
+        required: true
+      source_image:
+        description: "Optional: path to raw player photo in repo (e.g. assets/raw/pedri.jpg)"
+        required: false
+
+jobs:
+  make-thumbnail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: remotion/package-lock.json
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install requests pyyaml
+          cd remotion && npm ci
+
+      - name: Install Chrome rendering dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq chromium-browser libgbm-dev libasound2-dev xvfb
+
+      - name: Detect configs to process
+        id: configs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "configs=${{ inputs.config }}" >> $GITHUB_OUTPUT
+          else
+            # Find changed thumbnail configs
+            CHANGED=$(git diff --name-only HEAD~1 HEAD | grep 'thumbnails/variants/.*.yaml' | tr '\n' ' ')
+            echo "configs=$CHANGED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate thumbnails
+        env:
+          REMOVEBG_API_KEY: ${{ secrets.REMOVEBG_API_KEY }}
+        run: |
+          SOURCE_ARG=""
+          if [ -n "${{ inputs.source_image }}" ] && [ -f "${{ inputs.source_image }}" ]; then
+            SOURCE_ARG="--source-image ${{ inputs.source_image }}"
+          fi
+
+          for CONFIG in ${{ steps.configs.outputs.configs }}; do
+            echo "Processing: $CONFIG"
+            python thumbnails/generate_thumbnail.py "$CONFIG" $SOURCE_ARG
+          done
+
+      - name: Upload thumbnails
+        uses: actions/upload-artifact@v4
+        with:
+          name: thumbnails-${{ github.run_id }}
+          path: thumbnails/output/
+          retention-days: 30

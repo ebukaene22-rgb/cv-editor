@@ -1,0 +1,122 @@
+name: Make Episode
+
+# Triggers automatically when a script.json is pushed to any episode folder,
+# OR manually via the GitHub Actions UI with a specific slug.
+on:
+  push:
+    paths:
+      - "episodes/*/script.json"
+  workflow_dispatch:
+    inputs:
+      episode_slug:
+        description: "Episode folder name (e.g. 2026-06-14-nico-williams)"
+        required: true
+
+jobs:
+  make-episode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: remotion/package-lock.json
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install requests pyyaml elevenlabs
+
+      - name: Install Remotion dependencies
+        run: cd remotion && npm ci
+
+      # Remotion needs Chrome. ubuntu-latest ships Chromium; this installs its deps.
+      - name: Install Chrome rendering dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            chromium-browser \
+            libgbm-dev \
+            libasound2-dev \
+            fonts-liberation \
+            xvfb
+
+      - name: Detect episode slug
+        id: slug
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "slug=${{ inputs.episode_slug }}" >> $GITHUB_OUTPUT
+          else
+            # Find the episode folder from the pushed script.json path
+            SLUG=$(git diff --name-only HEAD~1 HEAD \
+              | grep 'episodes/.*/script.json' \
+              | head -1 \
+              | cut -d'/' -f2)
+            echo "slug=$SLUG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate script.json
+        run: |
+          python .claude/skills/football-scout/scripts/validate.py \
+            episodes/${{ steps.slug.outputs.slug }}/script.json
+
+      - name: Generate voiceover (ElevenLabs TTS)
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          python pipeline/tts.py \
+            episodes/${{ steps.slug.outputs.slug }}/script.json
+
+      - name: Render episode video (Remotion)
+        run: |
+          cd remotion
+          # swangle = software renderer, no GPU needed in CI
+          npx remotion render src/index.ts CaseFile \
+            ../episodes/${{ steps.slug.outputs.slug }}/episode.mp4 \
+            --props="$(cat ../episodes/${{ steps.slug.outputs.slug }}/script.json)" \
+            --gl=swangle \
+            --log=verbose
+
+      - name: Generate thumbnail (remove.bg + Remotion)
+        env:
+          REMOVEBG_API_KEY: ${{ secrets.REMOVEBG_API_KEY }}
+        run: |
+          SLUG=${{ steps.slug.outputs.slug }}
+          PLAYER=$(python3 -c "import json; d=json.load(open('episodes/$SLUG/script.json')); print(d['player'].lower().replace(' ','_'))")
+          CONFIG="thumbnails/variants/${PLAYER}-*.yaml"
+          # Use first matching config, or fall back to generating without cutout
+          MATCH=$(ls $CONFIG 2>/dev/null | head -1)
+          if [ -n "$MATCH" ]; then
+            python thumbnails/generate_thumbnail.py "$MATCH"
+          else
+            echo "No thumbnail config found for $PLAYER — skipping thumbnail render"
+          fi
+
+      - name: Upload episode artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-${{ steps.slug.outputs.slug }}
+          path: |
+            episodes/${{ steps.slug.outputs.slug }}/episode.mp4
+            episodes/${{ steps.slug.outputs.slug }}/vo.mp3
+            thumbnails/output/*_with_cutout.png
+            thumbnails/output/*_no_cutout.png
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          echo "## Episode ready for review" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slug:** \`${{ steps.slug.outputs.slug }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the mp4 + thumbnails from the **Artifacts** section above." >> $GITHUB_STEP_SUMMARY
+          echo "Review, then publish manually via YouTube Studio / TikTok." >> $GITHUB_STEP_SUMMARY
