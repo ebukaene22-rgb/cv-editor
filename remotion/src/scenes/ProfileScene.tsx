@@ -118,7 +118,10 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, du
   );
 };
 
-// Compact score + evidence line + benchmark, revealed under the tactical board.
+// V5: Score appears AFTER the tactical board has frozen with its annotation.
+// Evidence is proven first; the score is a verdict ON that evidence.
+// Board phase: 0-2.5s animation → 2.5-2.8s freeze annotation visible.
+// Score phase: slides in at 2.8s, so the viewer reads the annotation first.
 const ExhibitReadout: React.FC<{
   label: string; score: number; evidence: string; percentile: string;
   scoutNote?: string; color: string;
@@ -126,12 +129,18 @@ const ExhibitReadout: React.FC<{
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const opacity = interpolate(frame, [fps * 0.3, fps * 0.6], [0, 1], { extrapolateRight: "clamp" });
-  const scoreCount = interpolate(frame, [fps * 0.3, fps * 0.8], [0, score], { extrapolateRight: "clamp" });
+  // Wait for board to freeze before revealing score (V5: evidence → verdict order)
+  const revealStart = fps * 2.8;
+  const opacity = interpolate(frame, [revealStart, revealStart + fps * 0.25], [0, 1], { extrapolateRight: "clamp" });
+  const scoreCount = interpolate(frame, [revealStart, revealStart + fps * 0.5], [0, score], { extrapolateRight: "clamp" });
+  // Thin divider line sweeps in right as the score reveals — signals transition from evidence to verdict
+  const dividerWidth = interpolate(frame, [revealStart - fps * 0.1, revealStart + fps * 0.2], [0, 100], { extrapolateRight: "clamp" });
 
   return (
-    <div style={{ opacity, fontFamily: FONTS.mono, zIndex: 2 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+    <div style={{ fontFamily: FONTS.mono, zIndex: 2 }}>
+      {/* Sweep line: visual signal that evidence phase is done, verdict phase begins */}
+      <div style={{ width: `${dividerWidth}%`, height: 1, background: color, marginBottom: 16, opacity: 0.6 }} />
+      <div style={{ opacity, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <span style={{ fontSize: 30, color: COLORS.textMuted, letterSpacing: 4, textTransform: "uppercase" }}>
           {label}
         </span>
@@ -139,10 +148,10 @@ const ExhibitReadout: React.FC<{
           {Math.round(scoreCount)}
         </span>
       </div>
-      <div style={{ fontFamily: FONTS.sans, fontSize: 32, fontWeight: "bold", color: COLORS.text, lineHeight: 1.25, margin: "12px 0" }}>
+      <div style={{ opacity, fontFamily: FONTS.sans, fontSize: 32, fontWeight: "bold", color: COLORS.text, lineHeight: 1.25, margin: "12px 0" }}>
         {evidence}
       </div>
-      <div style={{ display: "inline-block", border: `1px solid ${color}`, padding: "6px 18px", fontSize: 22, color, letterSpacing: 3, textTransform: "uppercase" }}>
+      <div style={{ opacity, display: "inline-block", border: `1px solid ${color}`, padding: "6px 18px", fontSize: 22, color, letterSpacing: 3, textTransform: "uppercase" }}>
         {percentile}
       </div>
     </div>

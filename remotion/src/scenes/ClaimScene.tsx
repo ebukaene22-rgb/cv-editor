@@ -1,5 +1,6 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { PlayerCutout } from "../components/PlayerCutout";
+import { TacticalBoard } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
 import { deriveVerdict } from "../verdict";
 
@@ -171,6 +172,12 @@ export const ClaimScene: React.FC<Props> = ({
           {verdict.hook}
         </span>
       </div>
+
+      {/* V5: background tactical flash — immediate visual so mute viewer sees football proof */}
+      {/* Fades to near-invisible once the player cutout and claim dominate */}
+      <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none", opacity: interpolate(frame, [0, fps * 1.5, fps * 2.5], [0.18, 0.18, 0.06], { extrapolateRight: "clamp" }) }}>
+        <TacticalBoard motif="transition" label="" startFrame={0} />
+      </AbsoluteFill>
 
       {/* Hero player cutout — 35-40% of frame, slams in with claim */}
       {playerImageKey && (
