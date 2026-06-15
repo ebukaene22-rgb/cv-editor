@@ -1,4 +1,5 @@
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { ScoutNote } from "./ScoutNote";
 import { COLORS, FONTS } from "../theme";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   score: number;       // 1-10
   evidence: string;    // justification line
   percentile: string;  // benchmark chip
+  scoutNote?: string;  // optional analyst card that flies in after reveal
   startFrame: number;
   color?: string;
 }
@@ -19,6 +21,7 @@ export const EvidenceRow: React.FC<Props> = ({
   score,
   evidence,
   percentile,
+  scoutNote,
   startFrame,
   color = COLORS.scoreBar,
 }) => {
@@ -113,6 +116,16 @@ export const EvidenceRow: React.FC<Props> = ({
       >
         {percentile}
       </div>
+
+      {/* Scout note — flies in after the score is fully revealed */}
+      {scoutNote && (
+        <ScoutNote
+          text={scoutNote}
+          startFrame={startFrame + Math.round(fps * 0.9)}
+          position="top-right"
+          accent={color !== COLORS.gravity}
+        />
+      )}
     </div>
   );
 };

@@ -1,16 +1,20 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption";
+import { PlayerCutout } from "../components/PlayerCutout";
+import { ScoutNote } from "../components/ScoutNote";
 import { COLORS, FONTS } from "../theme";
 
 interface Props {
   tension: string;
+  playerImageKey?: string;
+  scoutNote?: string;
   durationFrames: number;
 }
 
 // V3: Why the popular take is wrong. 5-15s.
 // This scene builds the friction — "Everyone sees X. Nobody sees Y."
 // Dossier texture increases information density without needing footage.
-export const TensionScene: React.FC<Props> = ({ tension, durationFrames }) => {
+export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNote, durationFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -102,6 +106,16 @@ export const TensionScene: React.FC<Props> = ({ tension, durationFrames }) => {
           endFrame={durationFrames - Math.round(fps * 0.4)}
         />
       </div>
+
+      {/* Medium player cutout — fades in at 50% opacity for recognition without dominating text */}
+      {playerImageKey && (
+        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
+          <PlayerCutout imageKey={playerImageKey} mode="medium" />
+        </AbsoluteFill>
+      )}
+
+      {/* Optional scout note — analyst annotation that slides in mid-scene */}
+      {scoutNote && <ScoutNote text={scoutNote} startFrame={Math.round(fps * 1.2)} position="top-right" accent />}
 
       {/* Bottom accent line — "folder closed" feeling */}
       <div

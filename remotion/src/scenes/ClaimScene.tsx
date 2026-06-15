@@ -1,4 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { PlayerCutout } from "../components/PlayerCutout";
 import { COLORS, FONTS } from "../theme";
 import { deriveVerdict } from "../verdict";
 
@@ -8,6 +9,7 @@ interface Props {
   transferability: number;
   verdictHook?: string;
   verdictLabel?: string;
+  playerImageKey?: string;
   durationFrames: number;
 }
 
@@ -20,6 +22,7 @@ export const ClaimScene: React.FC<Props> = ({
   transferability,
   verdictHook,
   verdictLabel,
+  playerImageKey,
   durationFrames,
 }) => {
   const frame = useCurrentFrame();
@@ -168,6 +171,13 @@ export const ClaimScene: React.FC<Props> = ({
           {verdict.hook}
         </span>
       </div>
+
+      {/* Hero player cutout — 35-40% of frame, slams in with claim */}
+      {playerImageKey && (
+        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
+          <PlayerCutout imageKey={playerImageKey} mode="hero" />
+        </AbsoluteFill>
+      )}
 
       {/* Scanline flicker */}
       <AbsoluteFill

@@ -1,12 +1,14 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { EvidenceRow } from "../components/EvidenceRow";
+import { PlayerCutout } from "../components/PlayerCutout";
 import { COLORS, FONTS } from "../theme";
 import { ScriptAxes, ScriptScores } from "../types";
 
 interface Props {
   scores: ScriptScores;
   axes?: ScriptAxes;
-  evidence: string;      // spoken narration for this beat (15-30s)
+  evidence: string;
+  playerImageKey?: string;
   durationFrames: number;
 }
 
@@ -17,9 +19,7 @@ const FALLBACK: ScriptAxes = {
   gravity: { evidence: "Defenders react before he touches it.", percentile: "HIGH PULL" },
 };
 
-export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) => {
-  // `evidence` prop is spoken by voiceover — on screen the exhibits carry
-  // the same information in dossier form so both channels reinforce each other.
+export const ProfileScene: React.FC<Props> = ({ scores, axes, evidence, playerImageKey, durationFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -72,14 +72,22 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) 
         </span>
       </div>
 
+      {/* Ghost player cutout — identity anchor while evidence builds */}
+      {playerImageKey && (
+        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
+          <PlayerCutout imageKey={playerImageKey} mode="ghost" />
+        </AbsoluteFill>
+      )}
+
       {/* Evidence stack */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 56 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 56, position: "relative" }}>
         <EvidenceRow
           exhibit="A"
           label="Instinct"
           score={scores.instinct}
           evidence={ev.instinct.evidence}
           percentile={ev.instinct.percentile}
+          scoutNote={scores.instinct >= 8 ? "Elite Trait" : scores.instinct <= 4 ? "High Collapse Risk" : undefined}
           startFrame={aStart}
           color={COLORS.scoreBar}
         />
@@ -89,6 +97,7 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) 
           score={scores.iq}
           evidence={ev.iq.evidence}
           percentile={ev.iq.percentile}
+          scoutNote={scores.iq <= 5 ? "System Dependency" : scores.iq >= 8 ? "Tactical Outlier" : undefined}
           startFrame={bStart}
           color={COLORS.scoreBar}
         />
@@ -98,6 +107,7 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, durationFrames }) 
           score={scores.gravity}
           evidence={ev.gravity.evidence}
           percentile={ev.gravity.percentile}
+          scoutNote={scores.gravity >= 8 ? "Portable Gravity" : undefined}
           startFrame={cStart}
           color={COLORS.gravity}
         />

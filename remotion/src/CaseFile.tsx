@@ -1,7 +1,6 @@
 import {
   AbsoluteFill,
   Audio,
-  Img,
   Sequence,
   staticFile,
   useVideoConfig,
@@ -14,8 +13,13 @@ import { LoopScene } from "./scenes/LoopScene";
 import { BEAT_START, DURATION_S } from "./theme";
 import { ScriptData } from "./types";
 
-// V3: story-first. Five beats — claim, tension, evidence, reveal, loop.
-// Props are the full script.json, passed via --props at render time.
+// V4: visual-first investigation.
+// Player cutout is passed to each scene with the correct opacity mode:
+//   claim   → hero (35-40% of frame, emotional entrance)
+//   tension → medium (50% opacity, parallax, recognition without domination)
+//   evidence → ghost (14% opacity, identity anchor while exhibits build)
+//   reveal  → no cutout (classification sequence owns the frame)
+//   loop    → no cutout (question owns the frame)
 export const CaseFile: React.FC<ScriptData> = (props) => {
   const { fps } = useVideoConfig();
 
@@ -33,23 +37,6 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
     <AbsoluteFill>
       <Audio src={staticFile("vo.mp3")} />
 
-      {/* Player image — ghost background visible across all scenes */}
-      {props.player_image_key && (
-        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
-          <Img
-            src={staticFile(props.player_image_key)}
-            style={{
-              position: "absolute",
-              right: 0,
-              bottom: 0,
-              height: "65%",
-              opacity: 0.18,
-              mixBlendMode: "luminosity",
-            }}
-          />
-        </AbsoluteFill>
-      )}
-
       <Sequence from={beats.claim.from} durationInFrames={beats.claim.dur} name="Claim">
         <ClaimScene
           player={props.player}
@@ -57,6 +44,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
           transferability={props.transferability}
           verdictHook={props.verdict_hook}
           verdictLabel={props.verdict_label}
+          playerImageKey={props.player_image_key}
           durationFrames={beats.claim.dur}
         />
       </Sequence>
@@ -64,6 +52,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
       <Sequence from={beats.tension.from} durationInFrames={beats.tension.dur} name="Tension">
         <TensionScene
           tension={props.beats.tension}
+          playerImageKey={props.player_image_key}
           durationFrames={beats.tension.dur}
         />
       </Sequence>
@@ -73,6 +62,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
           scores={props.scores}
           axes={props.axes}
           evidence={props.beats.evidence}
+          playerImageKey={props.player_image_key}
           durationFrames={beats.evidence.dur}
         />
       </Sequence>
