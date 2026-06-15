@@ -148,13 +148,8 @@ jobs:
           if [ -f "$CLIPS_JSON" ]; then
             CLIPS_PROPS=$(python3 pipeline/clips_to_props.py "$CLIPS_JSON" remotion/public/clips)
             if [ -n "$CLIPS_PROPS" ] && [ "$CLIPS_PROPS" != "{}" ]; then
-              PROPS=$(python3 -c "
-import json, sys
-d = json.loads(sys.argv[1])
-d['clips'] = json.loads(sys.argv[2])
-print(json.dumps(d))
-" "$PROPS" "$CLIPS_PROPS")
-              echo "Clips injected into props: $(echo $CLIPS_PROPS | python3 -c 'import json,sys; print(list(json.loads(sys.stdin.read()).keys()))')"
+              PROPS=$(python3 -c "import json,sys; d=json.loads(sys.argv[1]); d['clips']=json.loads(sys.argv[2]); print(json.dumps(d))" "$PROPS" "$CLIPS_PROPS")
+              echo "Clips injected: $CLIPS_PROPS"
             fi
           fi
 
