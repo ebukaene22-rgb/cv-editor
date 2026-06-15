@@ -1,6 +1,6 @@
-import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { EvidenceRow } from "../components/EvidenceRow";
+import { AbsoluteFill, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { PlayerCutout } from "../components/PlayerCutout";
+import { TacticalBoard, Motif } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
 import { ScriptAxes, ScriptScores } from "../types";
 
@@ -12,38 +12,62 @@ interface Props {
   durationFrames: number;
 }
 
-// Fallback evidence if a script predates the V2 `axes` field.
 const FALLBACK: ScriptAxes = {
   instinct: { evidence: "Reads danger before it forms.", percentile: "ELITE TRAIT" },
   iq: { evidence: "Solves moments, not structures.", percentile: "ROLE-DEPENDENT" },
   gravity: { evidence: "Defenders react before he touches it.", percentile: "HIGH PULL" },
 };
 
-export const ProfileScene: React.FC<Props> = ({ scores, axes, evidence, playerImageKey, durationFrames }) => {
+// Each axis is shown as a self-contained EXHIBIT: a tactical reconstruction
+// (the visual proof) dominates the frame while the score + scout note overlay.
+// Footage dominates, text supports — per the V4 brief.
+export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, durationFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const ev = axes ?? FALLBACK;
+  const sub = Math.floor(durationFrames / 3);
 
-  const headerOpacity = interpolate(frame, [0, fps * 0.3], [0, 1], {
-    extrapolateRight: "clamp",
-  });
+  const headerOpacity = interpolate(frame, [0, fps * 0.3], [0, 1], { extrapolateRight: "clamp" });
 
-  // Each exhibit enters ~1.5s after the last — evidence stacking up.
-  const aStart = Math.round(fps * 0.4);
-  const bStart = Math.round(fps * 1.9);
-  const cStart = Math.round(fps * 3.4);
+  const exhibits: {
+    key: string; exhibit: string; label: string; score: number;
+    evidence: string; percentile: string; motif: Motif; motifLabel: string;
+    scoutNote?: string; color: string;
+  }[] = [
+    {
+      key: "instinct", exhibit: "A", label: "Instinct", score: scores.instinct,
+      evidence: ev.instinct.evidence, percentile: ev.instinct.percentile,
+      motif: "transition", motifLabel: "SPACE IN BEHIND",
+      scoutNote: scores.instinct >= 8 ? "Elite Trait" : scores.instinct <= 4 ? "High Collapse Risk" : undefined,
+      color: COLORS.scoreBar,
+    },
+    {
+      key: "iq", exhibit: "B", label: "Football IQ", score: scores.iq,
+      evidence: ev.iq.evidence, percentile: ev.iq.percentile,
+      motif: "low_block", motifLabel: "NO PASSING LANE",
+      scoutNote: scores.iq <= 5 ? "System Dependency" : scores.iq >= 8 ? "Tactical Outlier" : undefined,
+      color: COLORS.scoreBar,
+    },
+    {
+      key: "gravity", exhibit: "C", label: "Gravity", score: scores.gravity,
+      evidence: ev.gravity.evidence, percentile: ev.gravity.percentile,
+      motif: "gravity", motifLabel: "SPACE CREATED",
+      scoutNote: scores.gravity >= 8 ? "Portable Gravity" : undefined,
+      color: COLORS.gravity,
+    },
+  ];
 
   return (
-    <AbsoluteFill
-      style={{
-        background: COLORS.bg,
-        display: "flex",
-        flexDirection: "column",
-        padding: "90px 60px",
-      }}
-    >
-      {/* Header */}
+    <AbsoluteFill style={{ background: COLORS.bg, display: "flex", flexDirection: "column", padding: "90px 60px" }}>
+      {/* Ghost cutout — identity anchor, persists across all exhibits */}
+      {playerImageKey && (
+        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
+          <PlayerCutout imageKey={playerImageKey} mode="ghost" />
+        </AbsoluteFill>
+      )}
+
+      {/* Header — persists */}
       <div
         style={{
           opacity: headerOpacity,
@@ -52,66 +76,75 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, evidence, playerIm
           alignItems: "baseline",
           borderBottom: `1px solid ${COLORS.border}`,
           paddingBottom: 24,
-          marginBottom: 48,
+          marginBottom: 32,
+          zIndex: 2,
         }}
       >
-        <span
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 26,
-            color: COLORS.accent,
-            letterSpacing: 6,
-            textTransform: "uppercase",
-          }}
-        >
+        <span style={{ fontFamily: FONTS.mono, fontSize: 26, color: COLORS.accent, letterSpacing: 6, textTransform: "uppercase" }}>
           The Evidence
         </span>
-        {/* "Evidence" is the section label in V3 — framework is supporting proof */}
         <span style={{ fontFamily: FONTS.mono, fontSize: 20, color: COLORS.textDim, letterSpacing: 3 }}>
           3-AXIS SCAN
         </span>
       </div>
 
-      {/* Ghost player cutout — identity anchor while evidence builds */}
-      {playerImageKey && (
-        <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
-          <PlayerCutout imageKey={playerImageKey} mode="ghost" />
-        </AbsoluteFill>
-      )}
+      {/* One exhibit at a time — tactical board dominant, score overlaid */}
+      {exhibits.map((ex, i) => (
+        <Sequence key={ex.key} from={i * sub} durationInFrames={sub} name={`Exhibit-${ex.exhibit}`} layout="none">
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 28 }}>
+            {/* Exhibit tag */}
+            <span style={{ fontFamily: FONTS.mono, fontSize: 22, color: COLORS.textDim, letterSpacing: 4 }}>
+              EXHIBIT {ex.exhibit}
+            </span>
 
-      {/* Evidence stack */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 56, position: "relative" }}>
-        <EvidenceRow
-          exhibit="A"
-          label="Instinct"
-          score={scores.instinct}
-          evidence={ev.instinct.evidence}
-          percentile={ev.instinct.percentile}
-          scoutNote={scores.instinct >= 8 ? "Elite Trait" : scores.instinct <= 4 ? "High Collapse Risk" : undefined}
-          startFrame={aStart}
-          color={COLORS.scoreBar}
-        />
-        <EvidenceRow
-          exhibit="B"
-          label="Football IQ"
-          score={scores.iq}
-          evidence={ev.iq.evidence}
-          percentile={ev.iq.percentile}
-          scoutNote={scores.iq <= 5 ? "System Dependency" : scores.iq >= 8 ? "Tactical Outlier" : undefined}
-          startFrame={bStart}
-          color={COLORS.scoreBar}
-        />
-        <EvidenceRow
-          exhibit="C"
-          label="Gravity"
-          score={scores.gravity}
-          evidence={ev.gravity.evidence}
-          percentile={ev.gravity.percentile}
-          scoutNote={scores.gravity >= 8 ? "Portable Gravity" : undefined}
-          startFrame={cStart}
-          color={COLORS.gravity}
-        />
-      </div>
+            {/* Tactical reconstruction — the dominant visual */}
+            <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative" }}>
+              <TacticalBoard motif={ex.motif} label={ex.motifLabel} startFrame={0} />
+            </div>
+
+            {/* Score + evidence overlay below the board */}
+            <ExhibitReadout
+              label={ex.label}
+              score={ex.score}
+              evidence={ex.evidence}
+              percentile={ex.percentile}
+              scoutNote={ex.scoutNote}
+              color={ex.color}
+            />
+          </div>
+        </Sequence>
+      ))}
     </AbsoluteFill>
+  );
+};
+
+// Compact score + evidence line + benchmark, revealed under the tactical board.
+const ExhibitReadout: React.FC<{
+  label: string; score: number; evidence: string; percentile: string;
+  scoutNote?: string; color: string;
+}> = ({ label, score, evidence, percentile, color }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const opacity = interpolate(frame, [fps * 0.3, fps * 0.6], [0, 1], { extrapolateRight: "clamp" });
+  const scoreCount = interpolate(frame, [fps * 0.3, fps * 0.8], [0, score], { extrapolateRight: "clamp" });
+
+  return (
+    <div style={{ opacity, fontFamily: FONTS.mono, zIndex: 2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontSize: 30, color: COLORS.textMuted, letterSpacing: 4, textTransform: "uppercase" }}>
+          {label}
+        </span>
+        <span style={{ fontSize: 80, fontWeight: "bold", color, lineHeight: 1 }}>
+          {Math.round(scoreCount)}
+        </span>
+      </div>
+      <div style={{ fontFamily: FONTS.sans, fontSize: 32, fontWeight: "bold", color: COLORS.text, lineHeight: 1.25, margin: "12px 0" }}>
+        {evidence}
+      </div>
+      <div style={{ display: "inline-block", border: `1px solid ${color}`, padding: "6px 18px", fontSize: 22, color, letterSpacing: 3, textTransform: "uppercase" }}>
+        {percentile}
+      </div>
+    </div>
   );
 };

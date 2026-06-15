@@ -2,6 +2,7 @@ import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remo
 import { Caption } from "../components/Caption";
 import { PlayerCutout } from "../components/PlayerCutout";
 import { ScoutNote } from "../components/ScoutNote";
+import { TacticalBoard } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
 
 interface Props {
@@ -11,9 +12,9 @@ interface Props {
   durationFrames: number;
 }
 
-// V3: Why the popular take is wrong. 5-15s.
-// This scene builds the friction — "Everyone sees X. Nobody sees Y."
-// Dossier texture increases information density without needing footage.
+// V4: Why the popular take is wrong. 5-15s.
+// "Everyone sees X. Nobody sees Y." The tactical board shows the problem
+// directly — a settled low block where the player's game stops working.
 export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNote, durationFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -21,13 +22,6 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
   const headerOpacity = interpolate(frame, [0, fps * 0.25], [0, 1], {
     extrapolateRight: "clamp",
   });
-
-  // Three redacted lines animate in (dossier visual texture) before the caption.
-  const redactedLines = [
-    { width: "78%", delay: 0 },
-    { width: "55%", delay: fps * 0.12 },
-    { width: "88%", delay: fps * 0.22 },
-  ];
 
   const accentBarProgress = interpolate(frame, [fps * 0.1, fps * 0.6], [0, 1], {
     extrapolateRight: "clamp",
@@ -49,7 +43,8 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
           display: "flex",
           alignItems: "center",
           gap: 20,
-          marginBottom: 60,
+          marginBottom: 40,
+          zIndex: 2,
         }}
       >
         {/* Animated accent bar */}
@@ -74,32 +69,13 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
         </span>
       </div>
 
-      {/* Redacted dossier lines — visual texture, enter staggered */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 60 }}>
-        {redactedLines.map((line, i) => {
-          const lineOpacity = interpolate(
-            frame,
-            [line.delay, line.delay + fps * 0.2],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-          );
-          return (
-            <div
-              key={i}
-              style={{
-                height: 14,
-                borderRadius: 3,
-                background: COLORS.border,
-                width: line.width,
-                opacity: lineOpacity,
-              }}
-            />
-          );
-        })}
+      {/* Tactical reconstruction — the problem shown, not just stated */}
+      <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative", marginBottom: 36, zIndex: 2 }}>
+        <TacticalBoard motif="low_block" label="SETTLED POSSESSION" startFrame={Math.round(fps * 0.4)} />
       </div>
 
       {/* Tension caption — word by word, investigative */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+      <div style={{ zIndex: 2 }}>
         <Caption
           text={tension}
           startFrame={Math.round(fps * 0.5)}
@@ -107,7 +83,7 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
         />
       </div>
 
-      {/* Medium player cutout — fades in at 50% opacity for recognition without dominating text */}
+      {/* Medium player cutout — fades in at 50% opacity for recognition without dominating */}
       {playerImageKey && (
         <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none" }}>
           <PlayerCutout imageKey={playerImageKey} mode="medium" />
@@ -116,18 +92,6 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
 
       {/* Optional scout note — analyst annotation that slides in mid-scene */}
       {scoutNote && <ScoutNote text={scoutNote} startFrame={Math.round(fps * 1.2)} position="top-right" accent />}
-
-      {/* Bottom accent line — "folder closed" feeling */}
-      <div
-        style={{
-          height: 1,
-          background: COLORS.border,
-          marginTop: 40,
-          opacity: interpolate(frame, [fps * 0.3, fps * 0.7], [0, 1], {
-            extrapolateRight: "clamp",
-          }),
-        }}
-      />
     </AbsoluteFill>
   );
 };
