@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Convert clips.json into Remotion-compatible props, including only clips that exist on disk.
+"""Convert clips.json → Remotion props, including only clips that exist on disk.
 
-Usage:
-    python pipeline/clips_to_props.py episodes/<slug>/clips.json remotion/public/clips/
+Output shape:
+    {
+      "claim":   {"src": "clips/claim.mp4",   "freezeAt": 1.5, "zoom": {...}, "annotations": [...]},
+      "tension": {...},
+      "instinct": {...}, "iq": {...}, "gravity": {...}
+    }
 
-Prints JSON to stdout. Only includes exhibits where the .mp4 file was actually fetched.
-CaseFile.tsx reads this as props.clips — absent keys cause ProfileScene to fall back to TacticalBoard.
+Missing keys cause the corresponding scene to fall back to its non-clip presentation.
 """
 import json
 import os
 import sys
+
+SLOTS = ["claim", "tension", "instinct", "iq", "gravity"]
 
 
 def main():
@@ -24,16 +29,23 @@ def main():
         clips = json.load(f)
 
     result = {}
-    for key, spec in clips.items():
-        mp4 = os.path.join(clips_dir, f"{key}.mp4")
-        if os.path.exists(mp4):
-            result[key] = {
-                "src": f"clips/{key}.mp4",
-                "freezeAt": spec["freeze_at"],
-                "annotations": spec["annotations"],
-            }
-        else:
-            print(f"[{key}] {mp4} not found — excluding from props", file=sys.stderr)
+    for slot in SLOTS:
+        spec = clips.get(slot)
+        if not spec:
+            continue
+        mp4 = os.path.join(clips_dir, f"{slot}.mp4")
+        if not os.path.exists(mp4):
+            print(f"[{slot}] {mp4} not found — excluding from props", file=sys.stderr)
+            continue
+
+        out = {
+            "src": f"clips/{slot}.mp4",
+            "freezeAt": float(spec.get("freeze_at", 1.5)),
+            "annotations": spec.get("annotations", []),
+        }
+        if spec.get("zoom"):
+            out["zoom"] = spec["zoom"]
+        result[slot] = out
 
     print(json.dumps(result))
 

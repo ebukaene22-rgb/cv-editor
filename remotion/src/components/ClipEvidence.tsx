@@ -1,45 +1,68 @@
 import { AbsoluteFill, Freeze, interpolate, OffthreadVideo, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { ClipAnnotation } from "../types";
+import { ClipAnnotation, ClipZoom } from "../types";
 import { COLORS, FONTS } from "../theme";
 
 interface Props {
   src: string;
   freezeAt: number;
   annotations: ClipAnnotation[];
+  zoom?: ClipZoom;
 }
 
-// V6: Real footage as primary evidence. Plays clip → freezes → SVG annotations appear.
-// The freeze-frame IS the evidence moment: the viewer reads space, movement, reaction.
-// Score reveals only after this is established (handled by parent ExhibitReadout timing).
-export const ClipEvidence: React.FC<Props> = ({ src, freezeAt, annotations }) => {
+// V6 Path A: Real footage as primary evidence. Plays clip → optionally Ken Burns
+// zooms toward the evidence point → freezes → SVG annotations animate in on the
+// frozen frame. The score reveals only after this (handled by parent timing).
+export const ClipEvidence: React.FC<Props> = ({ src, freezeAt, annotations, zoom }) => {
   const { fps } = useVideoConfig();
   const freezeFrame = Math.round(freezeAt * fps);
 
   return (
     <AbsoluteFill>
-      {/* Phase 1: clip plays live (0 → freezeFrame) */}
+      {/* Phase 1: clip plays live with optional Ken Burns zoom (0 → freezeFrame) */}
       <Sequence from={0} durationInFrames={freezeFrame} layout="none">
-        <AbsoluteFill>
-          <OffthreadVideo
-            src={staticFile(src)}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </AbsoluteFill>
+        <LiveClip src={src} freezeFrame={freezeFrame} zoom={zoom} />
       </Sequence>
 
-      {/* Phase 2: frozen frame + annotations (freezeFrame → end of exhibit) */}
+      {/* Phase 2: frozen frame at the zoomed-in state + annotations (freezeFrame → end) */}
       <Sequence from={freezeFrame} layout="none">
-        <FrozenFrame src={src} freezeFrame={freezeFrame} annotations={annotations} />
+        <FrozenFrame src={src} freezeFrame={freezeFrame} annotations={annotations} zoom={zoom} />
       </Sequence>
     </AbsoluteFill>
   );
 };
 
-// Inner component for the frozen phase — can use useCurrentFrame() safely
-// since it's inside a Sequence. Frame starts at 0 when the freeze begins.
-const FrozenFrame: React.FC<{ src: string; freezeFrame: number; annotations: ClipAnnotation[] }> = ({
-  src, freezeFrame, annotations,
-}) => {
+const LiveClip: React.FC<{ src: string; freezeFrame: number; zoom?: ClipZoom }> = ({ src, freezeFrame, zoom }) => {
+  const frame = useCurrentFrame();
+
+  // Ken Burns: scale 1.0 → zoom.scale over the clip's live phase, focused on (x, y).
+  const scale = zoom
+    ? interpolate(frame, [0, freezeFrame], [1, zoom.scale], { extrapolateRight: "clamp" })
+    : 1;
+  const originX = zoom?.x ?? 50;
+  const originY = zoom?.y ?? 50;
+
+  return (
+    <AbsoluteFill style={{ overflow: "hidden" }}>
+      <OffthreadVideo
+        src={staticFile(src)}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transform: `scale(${scale})`,
+          transformOrigin: `${originX}% ${originY}%`,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+const FrozenFrame: React.FC<{
+  src: string;
+  freezeFrame: number;
+  annotations: ClipAnnotation[];
+  zoom?: ClipZoom;
+}> = ({ src, freezeFrame, annotations, zoom }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -52,17 +75,27 @@ const FrozenFrame: React.FC<{ src: string; freezeFrame: number; annotations: Cli
     extrapolateRight: "clamp",
   });
 
+  // Frozen state holds the final zoomed scale; annotations live on top in the same coord space.
+  const scale = zoom?.scale ?? 1;
+  const originX = zoom?.x ?? 50;
+  const originY = zoom?.y ?? 50;
+
   return (
-    <AbsoluteFill>
-      {/* Frozen video frame */}
+    <AbsoluteFill style={{ overflow: "hidden" }}>
       <Freeze frame={freezeFrame}>
         <OffthreadVideo
           src={staticFile(src)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: `scale(${scale})`,
+            transformOrigin: `${originX}% ${originY}%`,
+          }}
         />
       </Freeze>
 
-      {/* SVG annotation overlay — dashed circles, movement arrows, space zones */}
+      {/* SVG annotation overlay — coords are in 0-100 wide, 0-177 tall (9:16) */}
       <svg
         viewBox="0 0 100 177"
         preserveAspectRatio="xMidYMid slice"

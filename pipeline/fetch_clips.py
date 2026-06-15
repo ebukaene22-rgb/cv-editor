@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fetch short evidence clips for a Case File episode.
+"""Fetch evidence clips for a Case File episode from explicit URLs + timestamps.
 
-Reads clips.json from the episode folder, searches YouTube for each exhibit,
-downloads the top result, cuts to the specified timestamp range, and writes
-to remotion/public/clips/<key>.mp4.
+V6 Path A: the operator provides 3-5 URLs in clips.json (one per scene slot
+they want real footage in). yt-dlp downloads ONLY the specified time segment
+via --download-sections, then ffmpeg scales to 9:16 portrait.
 
-If yt-dlp or ffmpeg fails for any clip, that clip is skipped and the Remotion
-component falls back to the procedural TacticalBoard for that exhibit.
+If any clip fails (404, region-locked, geo-blocked, etc.), it is skipped with
+a warning and that scene slot falls back to its non-clip presentation.
 
 Usage:
     python pipeline/fetch_clips.py episodes/<slug>/clips.json --out remotion/public/clips/
@@ -18,53 +18,76 @@ import subprocess
 import sys
 import tempfile
 
-EXHIBIT_KEYS = ["instinct", "iq", "gravity"]
+# Order matters only for log readability; each is independent.
+SLOTS = ["claim", "tension", "instinct", "iq", "gravity"]
 
 
-def fetch_clip(query: str, start: float, end: float, out_path: str) -> bool:
+def parse_time(t) -> float:
+    """Accept 7, 7.5, '7', '0:07', '1:23', '01:23' → seconds (float)."""
+    if isinstance(t, (int, float)):
+        return float(t)
+    s = str(t).strip()
+    if ":" in s:
+        parts = s.split(":")
+        if len(parts) == 2:
+            m, sec = parts
+            return int(m) * 60 + float(sec)
+        if len(parts) == 3:
+            h, m, sec = parts
+            return int(h) * 3600 + int(m) * 60 + float(sec)
+    return float(s)
+
+
+def fetch_clip(url: str, start: float, end: float, out_path: str) -> bool:
     duration = end - start
+    if duration <= 0:
+        print(f"  Bad time range: start={start} end={end}", file=sys.stderr)
+        return False
 
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         tmp_path = tmp.name
+    os.unlink(tmp_path)  # yt-dlp writes its own file at this path
 
     try:
-        # Search YouTube and download best quality up to 720p
+        # yt-dlp downloads ONLY the requested segment via --download-sections.
+        # *START-END format is the modern syntax (supports float seconds).
+        section = f"*{start}-{end}"
         dl = subprocess.run([
             "yt-dlp",
-            f"ytsearch1:{query}",
+            url,
+            "--download-sections", section,
+            "--force-keyframes-at-cuts",
             "--format", "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
             "--merge-output-format", "mp4",
             "--output", tmp_path,
             "--no-playlist",
-            "--max-downloads", "1",
             "--quiet",
             "--no-warnings",
-        ], capture_output=True, text=True, timeout=180)
+        ], capture_output=True, text=True, timeout=240)
 
         if dl.returncode != 0:
-            print(f"  yt-dlp error: {dl.stderr[:300]}", file=sys.stderr)
+            print(f"  yt-dlp error: {dl.stderr[:400]}", file=sys.stderr)
             return False
 
         if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
-            print(f"  yt-dlp produced no file for query {query!r}", file=sys.stderr)
+            print(f"  yt-dlp produced no file", file=sys.stderr)
             return False
 
-        # Cut to the specified segment and scale to 1080x1920 (9:16 portrait)
+        # Re-cut to exactly the requested duration (download-sections can
+        # over-shoot to nearest keyframe) and scale to 1080x1920 portrait.
         cut = subprocess.run([
             "ffmpeg", "-y",
-            "-ss", str(start),
             "-i", tmp_path,
             "-t", str(duration),
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-c:a", "aac", "-b:a", "128k",
-            # Scale to fit portrait frame; letterbox if source is landscape
             "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"
                    "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black",
             out_path,
-        ], capture_output=True, text=True, timeout=120)
+        ], capture_output=True, text=True, timeout=180)
 
         if cut.returncode != 0:
-            print(f"  ffmpeg error: {cut.stderr[:300]}", file=sys.stderr)
+            print(f"  ffmpeg error: {cut.stderr[:400]}", file=sys.stderr)
             return False
 
         size_kb = os.path.getsize(out_path) // 1024
@@ -95,30 +118,35 @@ def main():
 
     ok, failed = [], []
 
-    for key in EXHIBIT_KEYS:
-        spec = clips.get(key)
+    for slot in SLOTS:
+        spec = clips.get(slot)
         if not spec:
-            print(f"[{key}] No spec in clips.json — skipping")
             continue
 
-        out_path = os.path.join(args.out, f"{key}.mp4")
+        url = spec.get("url", "")
+        if not url or url.startswith("PASTE_") or not url.startswith(("http://", "https://")):
+            print(f"[{slot}] URL not set ({url!r}) — skipping (scene uses non-clip fallback)")
+            continue
+
+        out_path = os.path.join(args.out, f"{slot}.mp4")
         if os.path.exists(out_path):
-            print(f"[{key}] Already present — skipping")
-            ok.append(key)
+            print(f"[{slot}] Already present — skipping")
+            ok.append(slot)
             continue
 
-        query = spec["query"]
-        start = spec.get("start", 0)
-        end = spec.get("end", start + 3)
+        start = parse_time(spec.get("start", 0))
+        end = parse_time(spec.get("end", start + 3))
 
-        print(f"[{key}] Fetching: {query!r} [{start}s–{end}s]")
-        if fetch_clip(query, start, end, out_path):
-            ok.append(key)
+        print(f"[{slot}] Fetching {url} [{start}s–{end}s]")
+        if fetch_clip(url, start, end, out_path):
+            ok.append(slot)
         else:
-            print(f"[{key}] FAILED — exhibit will use procedural TacticalBoard fallback")
-            failed.append(key)
+            print(f"[{slot}] FAILED — scene will use non-clip fallback")
+            failed.append(slot)
 
     print(f"\nDone: {len(ok)} clip(s) ready, {len(failed)} failed")
+    if ok:
+        print(f"Ready: {ok}")
     if failed:
         print(f"Failed: {failed}")
 

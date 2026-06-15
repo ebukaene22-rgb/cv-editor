@@ -1,7 +1,9 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { ClipEvidence } from "../components/ClipEvidence";
 import { PlayerCutout } from "../components/PlayerCutout";
 import { TacticalBoard } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
+import { ClipSpec } from "../types";
 import { deriveVerdict } from "../verdict";
 
 interface Props {
@@ -12,6 +14,7 @@ interface Props {
   verdictLabel?: string;
   playerImageKey?: string;
   durationFrames: number;
+  clip?: ClipSpec;
 }
 
 // V3: The claim IS the hook. A single punchy sentence that poses the case.
@@ -25,6 +28,7 @@ export const ClaimScene: React.FC<Props> = ({
   verdictLabel,
   playerImageKey,
   durationFrames,
+  clip,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -173,10 +177,14 @@ export const ClaimScene: React.FC<Props> = ({
         </span>
       </div>
 
-      {/* V5: background tactical flash — immediate visual so mute viewer sees football proof */}
-      {/* Fades to near-invisible once the player cutout and claim dominate */}
-      <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none", opacity: interpolate(frame, [0, fps * 1.5, fps * 2.5], [0.18, 0.18, 0.06], { extrapolateRight: "clamp" }) }}>
-        <TacticalBoard motif="transition" label="" startFrame={0} />
+      {/* Background evidence layer — real clip (V6) or procedural tactical board fallback */}
+      {/* Fades back as the player cutout and claim text take over */}
+      <AbsoluteFill style={{ zIndex: 0, pointerEvents: "none", opacity: interpolate(frame, [0, fps * 1.5, fps * 2.5], [clip ? 0.55 : 0.18, clip ? 0.4 : 0.18, clip ? 0.18 : 0.06], { extrapolateRight: "clamp" }) }}>
+        {clip ? (
+          <ClipEvidence src={clip.src} freezeAt={clip.freezeAt} annotations={[]} zoom={clip.zoom} />
+        ) : (
+          <TacticalBoard motif="transition" label="" startFrame={0} />
+        )}
       </AbsoluteFill>
 
       {/* Hero player cutout — 35-40% of frame, slams in with claim */}

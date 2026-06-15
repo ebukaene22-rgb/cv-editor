@@ -46,6 +46,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
           verdictLabel={props.verdict_label}
           playerImageKey={props.player_image_key}
           durationFrames={beats.claim.dur}
+          clip={props.clips?.claim}
         />
       </Sequence>
 
@@ -54,6 +55,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
           tension={props.beats.tension}
           playerImageKey={props.player_image_key}
           durationFrames={beats.tension.dur}
+          clip={props.clips?.tension}
         />
       </Sequence>
 

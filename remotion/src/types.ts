@@ -47,13 +47,22 @@ export interface ClipAnnotation {
   color?: string; // defaults to accent red
 }
 
+export interface ClipZoom {
+  x: number;       // focal point x (0-100, % of clip width)
+  y: number;       // focal point y (0-100, % of clip height)
+  scale: number;   // final zoom scale at freeze, e.g. 1.4
+}
+
 export interface ClipSpec {
   src: string;        // relative to remotion/public/, e.g. "clips/instinct.mp4"
   freezeAt: number;   // seconds into clip to freeze for annotation
   annotations: ClipAnnotation[];
+  zoom?: ClipZoom;    // optional Ken Burns zoom toward the evidence
 }
 
 export interface EpisodeClips {
+  claim?: ClipSpec;
+  tension?: ClipSpec;
   instinct?: ClipSpec;
   iq?: ClipSpec;
   gravity?: ClipSpec;

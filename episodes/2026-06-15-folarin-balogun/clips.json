@@ -1,30 +1,62 @@
 {
-  "instinct": {
-    "query": "Folarin Balogun goal weak foot finish USA Paraguay Copa America 2024",
-    "start": 3,
-    "end": 7,
+  "_doc": [
+    "V6 Path A: paste 3-5 clip URLs + timestamps below. CI does the rest.",
+    "Time formats accepted: 7 | 7.5 | '0:07' | '1:23'",
+    "Coords for zoom + annotations: x is 0-100 (% width), y is 0-177 (9:16 height)",
+    "Leave any slot out entirely to use the non-clip fallback for that scene."
+  ],
+
+  "claim": {
+    "url": "PASTE_BALOGUN_GOAL_VS_PARAGUAY_URL",
+    "start": "0:00",
+    "end": "0:03",
     "freeze_at": 1.5,
+    "zoom": { "x": 50, "y": 60, "scale": 1.3 },
+    "annotations": []
+  },
+
+  "tension": {
+    "url": "PASTE_BALOGUN_DRIFT_POSSESSION_URL",
+    "start": "0:00",
+    "end": "0:04",
+    "freeze_at": 2.0,
+    "zoom": { "x": 50, "y": 100, "scale": 1.4 },
+    "annotations": [
+      { "type": "zone", "x": 16, "y": 65, "w": 68, "h": 45, "label": "STALLED PHASE", "color": "#888888" }
+    ]
+  },
+
+  "instinct": {
+    "url": "PASTE_WEAK_FOOT_FINISH_URL",
+    "start": "0:00",
+    "end": "0:03",
+    "freeze_at": 1.2,
+    "zoom": { "x": 50, "y": 80, "scale": 1.6 },
     "annotations": [
       { "type": "circle", "x": 50, "y": 108, "r": 7, "label": "BALOGUN" },
       { "type": "zone", "x": 32, "y": 48, "w": 36, "h": 22, "label": "COMMITTED EARLY" },
       { "type": "arrow", "x": 50, "y": 100, "x2": 50, "y2": 68 }
     ]
   },
+
   "iq": {
-    "query": "Folarin Balogun drift lose possession sustained pressure 2024",
-    "start": 6,
-    "end": 10,
+    "url": "PASTE_BALOGUN_LOST_IN_POSSESSION_URL",
+    "start": "0:00",
+    "end": "0:03",
     "freeze_at": 2.0,
+    "zoom": { "x": 50, "y": 90, "scale": 1.4 },
     "annotations": [
       { "type": "circle", "x": 50, "y": 105, "r": 7, "label": "BALOGUN" },
       { "type": "zone", "x": 16, "y": 65, "w": 68, "h": 45, "label": "STALLED PHASE", "color": "#888888" }
     ]
   },
+
   "gravity": {
-    "query": "Folarin Balogun run space created teammate USA goal 2024",
-    "start": 8,
-    "end": 12,
+    "url": "PASTE_REYNA_GOAL_BALOGUN_GRAVITY_URL",
+    "start": "0:00",
+    "end": "0:04",
     "freeze_at": 1.8,
+    "zoom": { "x": 50, "y": 80, "scale": 1.4 },
     "annotations": [
       { "type": "circle", "x": 40, "y": 95, "r": 7, "label": "BALOGUN" },
       { "type": "arrow", "x": 60, "y": 88, "x2": 46, "y2": 95, "color": "#888888" },

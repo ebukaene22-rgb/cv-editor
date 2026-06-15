@@ -1,21 +1,24 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption";
+import { ClipEvidence } from "../components/ClipEvidence";
 import { PlayerCutout } from "../components/PlayerCutout";
 import { ScoutNote } from "../components/ScoutNote";
 import { TacticalBoard } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
+import { ClipSpec } from "../types";
 
 interface Props {
   tension: string;
   playerImageKey?: string;
   scoutNote?: string;
   durationFrames: number;
+  clip?: ClipSpec;
 }
 
 // V4: Why the popular take is wrong. 5-15s.
 // "Everyone sees X. Nobody sees Y." The tactical board shows the problem
 // directly — a settled low block where the player's game stops working.
-export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNote, durationFrames }) => {
+export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNote, durationFrames, clip }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -69,9 +72,13 @@ export const TensionScene: React.FC<Props> = ({ tension, playerImageKey, scoutNo
         </span>
       </div>
 
-      {/* Tactical reconstruction — the problem shown, not just stated */}
-      <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative", marginBottom: 36, zIndex: 2 }}>
-        <TacticalBoard motif="low_block" label="SETTLED POSSESSION" startFrame={Math.round(fps * 0.4)} />
+      {/* The problem shown — real clip if available, tactical reconstruction otherwise */}
+      <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative", marginBottom: 36, zIndex: 2, overflow: "hidden" }}>
+        {clip ? (
+          <ClipEvidence src={clip.src} freezeAt={clip.freezeAt} annotations={clip.annotations} zoom={clip.zoom} />
+        ) : (
+          <TacticalBoard motif="low_block" label="SETTLED POSSESSION" startFrame={Math.round(fps * 0.4)} />
+        )}
       </div>
 
       {/* Tension caption — word by word, investigative */}

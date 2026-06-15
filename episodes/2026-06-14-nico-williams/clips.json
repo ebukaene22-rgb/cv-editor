@@ -1,31 +1,62 @@
 {
+  "_doc": [
+    "V6 Path A: paste 3-5 clip URLs + timestamps below. CI does the rest.",
+    "Time formats accepted: 7 | 7.5 | '0:07' | '1:23'",
+    "Coords for zoom + annotations: x is 0-100 (% width), y is 0-177 (9:16 height)",
+    "Leave any slot out entirely to use the non-clip fallback for that scene."
+  ],
+
+  "claim": {
+    "url": "PASTE_HERO_TRANSITION_CLIP_URL",
+    "start": "0:00",
+    "end": "0:03",
+    "freeze_at": 1.5,
+    "zoom": { "x": 50, "y": 60, "scale": 1.3 },
+    "annotations": []
+  },
+
+  "tension": {
+    "url": "PASTE_LOW_BLOCK_STRUGGLE_CLIP_URL",
+    "start": "0:00",
+    "end": "0:04",
+    "freeze_at": 2.0,
+    "zoom": { "x": 50, "y": 100, "scale": 1.4 },
+    "annotations": [
+      { "type": "zone", "x": 18, "y": 70, "w": 64, "h": 40, "label": "NO LANE", "color": "#888888" }
+    ]
+  },
+
   "instinct": {
-    "query": "Nico Williams sprint run behind defense goal Barcelona La Liga 2024",
-    "start": 8,
-    "end": 12,
-    "freeze_at": 1.8,
+    "url": "PASTE_TRANSITION_RUN_CLIP_URL",
+    "start": "0:00",
+    "end": "0:03",
+    "freeze_at": 1.5,
+    "zoom": { "x": 50, "y": 90, "scale": 1.5 },
     "annotations": [
       { "type": "circle", "x": 50, "y": 105, "r": 7, "label": "WILLIAMS" },
       { "type": "arrow", "x": 50, "y": 98, "x2": 50, "y2": 65 },
       { "type": "zone", "x": 26, "y": 50, "w": 48, "h": 22, "label": "SPACE IN BEHIND" }
     ]
   },
+
   "iq": {
-    "query": "Nico Williams lose ball tight space possession struggle low block 2024",
-    "start": 5,
-    "end": 9,
+    "url": "PASTE_POSSESSION_STRUGGLE_CLIP_URL",
+    "start": "0:00",
+    "end": "0:03",
     "freeze_at": 2.0,
+    "zoom": { "x": 50, "y": 90, "scale": 1.4 },
     "annotations": [
       { "type": "circle", "x": 50, "y": 110, "r": 7, "label": "WILLIAMS" },
-      { "type": "zone", "x": 18, "y": 70, "w": 64, "h": 40, "label": "BLOCKED LANE", "color": "#888888" },
-      { "type": "circle", "x": 48, "y": 85, "r": 5, "color": "#888888" }
+      { "type": "zone", "x": 18, "y": 70, "w": 64, "h": 40, "label": "BLOCKED LANE", "color": "#888888" }
     ]
   },
+
   "gravity": {
-    "query": "Nico Williams drawing defenders space teammate goal assist 2024",
-    "start": 10,
-    "end": 14,
+    "url": "PASTE_GRAVITY_CLIP_URL",
+    "start": "0:00",
+    "end": "0:04",
     "freeze_at": 1.6,
+    "zoom": { "x": 50, "y": 80, "scale": 1.4 },
     "annotations": [
       { "type": "circle", "x": 35, "y": 100, "r": 7, "label": "WILLIAMS" },
       { "type": "arrow", "x": 58, "y": 90, "x2": 42, "y2": 100, "color": "#888888" },
