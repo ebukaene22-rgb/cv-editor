@@ -9,34 +9,34 @@
   "image_query": "Folarin Balogun footballer",
 
   "thread": [
-    "Folarin Balogun scored twice for USA vs Paraguay. Arsenal sold him for the wrong reasons — but don't get carried away.",
-    "The brace came in a transition-heavy setup with open space. That system doesn't exist at most top clubs. Arsenal didn't mismanage him. They misread his type.",
-    "Instinct 8 — elite finisher in open play. IQ 6 — drifts and disappears in possession. Gravity 7 — stretches lines but needs space. Transferability: 60%.",
-    "60% means: survives a move to the right system. Collapses in a possession-dominant side. Would you build a top-four attack around him?"
+    "For 3 years the read on Balogun was 'good numbers, wrong system.' Then he scored twice vs Paraguay with his weak foot. The system product label just got complicated.",
+    "Goals are the receipt. Instinct and Gravity are the engine. That second finish was committed before the ball arrived. He also created a third goal without touching it.",
+    "Instinct 8 — decision made before the ball. IQ 6 — drifts in sustained possession. Gravity 7 — occupied both CBs, opened Reyna's lane. Transferability: 60%.",
+    "'System product' is a coordinate, not an insult. At a vertical side: lethal. At 65% possession: a problem. Same player. Different room. Would you buy him?"
   ],
 
   "axes": {
     "instinct": {
-      "evidence": "Finds the net before defenders recover. Clinical in open play.",
-      "percentile": "Top 15% in transition finishing"
+      "evidence": "Weak-foot finish vs Paraguay — committed before the ball arrived.",
+      "percentile": "Top 10% in pre-action reads"
     },
     "iq": {
-      "evidence": "Drifts and loses shape in possession. Becomes invisible in structure.",
+      "evidence": "Drifts and stalls phases in sustained possession.",
       "percentile": "Bottom 35% in possession systems"
     },
     "gravity": {
-      "evidence": "Pace stretches defensive lines — but only when given space to run into.",
-      "percentile": "Top 25% in depth creation"
+      "evidence": "Occupied both centre-backs, opened Reyna's lane. Third assist without touching it.",
+      "percentile": "Top 20% off-ball distortion"
     }
   },
 
   "beats": {
-    "claim":    "Folarin Balogun scored twice for the USA. That does not mean what you think.",
-    "tension":  "Everyone is celebrating the Arsenal redemption arc. Nobody is looking at the system he scored in. Those goals came in a transition-heavy setup with open space. Change the structure and those goals do not happen.",
-    "evidence": "Instinct: eight. In open play his movement and finishing are elite — he finds the net before defenders recover. IQ: six. In possession-heavy systems he drifts, loses structure, becomes invisible. Gravity: seven. His pace stretches defensive lines and creates depth, but only when given space to run into.",
-    "reveal":   "Transferability: sixty percent. That survives a move. But only to the right system. A transition-heavy side works. A possession-dominant top-four club collapses this. Arsenal did not mismanage him — they misread his type.",
-    "loop":     "Would you build a top-four attack around a sixty percent transferability striker?"
+    "claim":    "Folarin Balogun scored twice for the USA. The system product label just got complicated.",
+    "tension":  "Most people watched the goals. Nobody watched the decision that produced them. That second finish — off-balance, weak foot, first time, top corner. The decision was made before the ball arrived. That is not technique. That is Instinct.",
+    "evidence": "Instinct: eight. His reads are elite — the weak-foot finish was committed before the ball arrived. IQ: six. In sustained possession he drifts and stalls phases. Gravity: seven. He occupied both centre-backs on a vertical run, opened Reyna's lane, and created a third goal without touching the ball.",
+    "reveal":   "Transferability: sixty percent. System product is a coordinate, not an insult. Balogun at a vertical counter-pressing side is lethal. Balogun as a number nine with sixty-five percent possession is a problem. Same player. Different room.",
+    "loop":     "Is the most expensive striker this window the bigger transfer risk?"
   },
 
-  "word_count": 140
+  "word_count": 144
 }
