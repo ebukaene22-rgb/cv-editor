@@ -40,13 +40,12 @@ def main():
     script = json.loads(script_path.read_text())
 
     beats = script["beats"]
-    # Read the beats in order, separated by a short pause marker.
-    full_text = " ".join([
-        beats["hook"],
-        beats["profile"],
-        beats["verdict"],
-        beats["loop"],
-    ])
+    # V3 beat order: claim → tension → evidence → reveal → loop
+    beat_keys = ["claim", "tension", "evidence", "reveal", "loop"]
+    # Fall back to V2 keys if this is an older script
+    if "hook" in beats:
+        beat_keys = ["hook", "profile", "verdict", "loop"]
+    full_text = " ".join(beats[k] for k in beat_keys)
 
     client = ElevenLabs(api_key=api_key)
 
