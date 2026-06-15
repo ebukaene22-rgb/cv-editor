@@ -1,0 +1,42 @@
+{
+  "player": "Folarin Balogun",
+  "format": "player-profile",
+  "scores": { "instinct": 8, "iq": 6, "gravity": 7 },
+  "context_risk": 9,
+  "transferability": 60,
+  "verdict_hook": "FRAUD WATCH?",
+  "verdict_label": "TRANSITION SPECIALIST — SYSTEM-DEPENDENT",
+  "image_query": "Folarin Balogun footballer",
+
+  "thread": [
+    "Folarin Balogun scored twice for USA vs Paraguay. Arsenal sold him for the wrong reasons — but don't get carried away.",
+    "The brace came in a transition-heavy setup with open space. That system doesn't exist at most top clubs. Arsenal didn't mismanage him. They misread his type.",
+    "Instinct 8 — elite finisher in open play. IQ 6 — drifts and disappears in possession. Gravity 7 — stretches lines but needs space. Transferability: 60%.",
+    "60% means: survives a move to the right system. Collapses in a possession-dominant side. Would you build a top-four attack around him?"
+  ],
+
+  "axes": {
+    "instinct": {
+      "evidence": "Finds the net before defenders recover. Clinical in open play.",
+      "percentile": "Top 15% in transition finishing"
+    },
+    "iq": {
+      "evidence": "Drifts and loses shape in possession. Becomes invisible in structure.",
+      "percentile": "Bottom 35% in possession systems"
+    },
+    "gravity": {
+      "evidence": "Pace stretches defensive lines — but only when given space to run into.",
+      "percentile": "Top 25% in depth creation"
+    }
+  },
+
+  "beats": {
+    "claim":    "Folarin Balogun scored twice for the USA. That does not mean what you think.",
+    "tension":  "Everyone is celebrating the Arsenal redemption arc. Nobody is looking at the system he scored in. Those goals came in a transition-heavy setup with open space. Change the structure and those goals do not happen.",
+    "evidence": "Instinct: eight. In open play his movement and finishing are elite — he finds the net before defenders recover. IQ: six. In possession-heavy systems he drifts, loses structure, becomes invisible. Gravity: seven. His pace stretches defensive lines and creates depth, but only when given space to run into.",
+    "reveal":   "Transferability: sixty percent. That survives a move. But only to the right system. A transition-heavy side works. A possession-dominant top-four club collapses this. Arsenal did not mismanage him — they misread his type.",
+    "loop":     "Would you build a top-four attack around a sixty percent transferability striker?"
+  },
+
+  "word_count": 140
+}

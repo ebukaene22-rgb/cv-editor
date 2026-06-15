@@ -1,0 +1,32 @@
+player: Folarin Balogun
+slug: 2026-06-15-folarin-balogun
+position: Centre-forward
+club: Monaco (ex-Arsenal)
+nationality: USA (also England-eligible)
+age: 25
+
+# System context
+system: Transition-heavy 4-4-2, USA national team at 2026 World Cup
+recent_form: Brace vs Paraguay, 2026 World Cup group stage
+
+# Scoring anchors
+# Instinct 8 — clinical in open play, elite first-touch finishing in transition
+#              but not at the 9-level of truly instinctive decision-makers
+# IQ 6       — solid positional awareness in transition; drifts and becomes
+#              passive in structured possession phases
+# Gravity 7  — pace and movement stretch backlines; creates depth and opens
+#              space for teammates, but requires room to activate
+context_risk: 9
+# context_risk breakdown:
+#   transition-only striker (game only functions in open play): +5
+#   unproven at true top-six level consistently: +4
+#   total: 9
+
+notes: |
+  Balogun's 2022-23 Reims loan (21 Ligue 1 goals) was the first real evidence
+  of his quality — and it was almost entirely transition football. Arsenal
+  never found a way to use him in their possession system and shipped him out.
+  His World Cup brace vs Paraguay came in a match with high defensive lines and
+  open transitions — exactly the conditions where his profile thrives.
+  The question is not whether he can score. It is whether he can score outside
+  that one context.
