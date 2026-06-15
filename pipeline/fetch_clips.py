@@ -45,6 +45,10 @@ def fetch_clip(query: str, start: float, end: float, out_path: str) -> bool:
             print(f"  yt-dlp error: {dl.stderr[:300]}", file=sys.stderr)
             return False
 
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+            print(f"  yt-dlp produced no file for query {query!r}", file=sys.stderr)
+            return False
+
         # Cut to the specified segment and scale to 1080x1920 (9:16 portrait)
         cut = subprocess.run([
             "ffmpeg", "-y",
@@ -69,6 +73,9 @@ def fetch_clip(query: str, start: float, end: float, out_path: str) -> bool:
 
     except subprocess.TimeoutExpired:
         print(f"  Timeout fetching clip", file=sys.stderr)
+        return False
+    except FileNotFoundError as e:
+        print(f"  Missing tool: {e}", file=sys.stderr)
         return False
     finally:
         if os.path.exists(tmp_path):

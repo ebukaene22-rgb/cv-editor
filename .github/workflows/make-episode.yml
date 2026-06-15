@@ -42,7 +42,7 @@ jobs:
         run: cd remotion && npm ci
 
       # Remotion needs Chrome. ubuntu-latest ships Chromium; this installs its deps.
-      - name: Install Chrome rendering dependencies
+      - name: Install Chrome + ffmpeg rendering dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -50,7 +50,8 @@ jobs:
             libgbm-dev \
             libasound2-dev \
             fonts-liberation \
-            xvfb
+            xvfb \
+            ffmpeg
 
       - name: Detect episode slug
         id: slug
