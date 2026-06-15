@@ -1,0 +1,35 @@
+{
+  "instinct": {
+    "query": "Folarin Balogun goal weak foot finish USA Paraguay Copa America 2024",
+    "start": 3,
+    "end": 7,
+    "freeze_at": 1.5,
+    "annotations": [
+      { "type": "circle", "x": 50, "y": 108, "r": 7, "label": "BALOGUN" },
+      { "type": "zone", "x": 32, "y": 48, "w": 36, "h": 22, "label": "COMMITTED EARLY" },
+      { "type": "arrow", "x": 50, "y": 100, "x2": 50, "y2": 68 }
+    ]
+  },
+  "iq": {
+    "query": "Folarin Balogun drift lose possession sustained pressure 2024",
+    "start": 6,
+    "end": 10,
+    "freeze_at": 2.0,
+    "annotations": [
+      { "type": "circle", "x": 50, "y": 105, "r": 7, "label": "BALOGUN" },
+      { "type": "zone", "x": 16, "y": 65, "w": 68, "h": 45, "label": "STALLED PHASE", "color": "#888888" }
+    ]
+  },
+  "gravity": {
+    "query": "Folarin Balogun run space created teammate USA goal 2024",
+    "start": 8,
+    "end": 12,
+    "freeze_at": 1.8,
+    "annotations": [
+      { "type": "circle", "x": 40, "y": 95, "r": 7, "label": "BALOGUN" },
+      { "type": "arrow", "x": 60, "y": 88, "x2": 46, "y2": 95, "color": "#888888" },
+      { "type": "arrow", "x": 75, "y": 92, "x2": 46, "y2": 95, "color": "#888888" },
+      { "type": "zone", "x": 58, "y": 52, "w": 34, "h": 30, "label": "REYNA'S LANE" }
+    ]
+  }
+}

@@ -1,8 +1,9 @@
 import { AbsoluteFill, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
+import { ClipEvidence } from "../components/ClipEvidence";
 import { PlayerCutout } from "../components/PlayerCutout";
 import { TacticalBoard, Motif } from "../components/TacticalBoard";
 import { COLORS, FONTS } from "../theme";
-import { ScriptAxes, ScriptScores } from "../types";
+import { EpisodeClips, ScriptAxes, ScriptScores } from "../types";
 
 interface Props {
   scores: ScriptScores;
@@ -10,6 +11,7 @@ interface Props {
   evidence: string;
   playerImageKey?: string;
   durationFrames: number;
+  clips?: EpisodeClips;
 }
 
 const FALLBACK: ScriptAxes = {
@@ -18,10 +20,11 @@ const FALLBACK: ScriptAxes = {
   gravity: { evidence: "Defenders react before he touches it.", percentile: "HIGH PULL" },
 };
 
-// Each axis is shown as a self-contained EXHIBIT: a tactical reconstruction
-// (the visual proof) dominates the frame while the score + scout note overlay.
-// Footage dominates, text supports — per the V4 brief.
-export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, durationFrames }) => {
+// Each axis is shown as a self-contained EXHIBIT.
+// V6: When CI has fetched evidence clips, ClipEvidence plays real footage → freeze → annotations.
+// Without clips, falls back to the procedural TacticalBoard (V4 mode).
+// Score reveals only AFTER the evidence is frozen on screen (V5 timing preserved).
+export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, durationFrames, clips }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -31,7 +34,7 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, du
   const headerOpacity = interpolate(frame, [0, fps * 0.3], [0, 1], { extrapolateRight: "clamp" });
 
   const exhibits: {
-    key: string; exhibit: string; label: string; score: number;
+    key: keyof EpisodeClips; exhibit: string; label: string; score: number;
     evidence: string; percentile: string; motif: Motif; motifLabel: string;
     scoutNote?: string; color: string;
   }[] = [
@@ -88,32 +91,43 @@ export const ProfileScene: React.FC<Props> = ({ scores, axes, playerImageKey, du
         </span>
       </div>
 
-      {/* One exhibit at a time — tactical board dominant, score overlaid */}
-      {exhibits.map((ex, i) => (
-        <Sequence key={ex.key} from={i * sub} durationInFrames={sub} name={`Exhibit-${ex.exhibit}`} layout="none">
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 28 }}>
-            {/* Exhibit tag */}
-            <span style={{ fontFamily: FONTS.mono, fontSize: 22, color: COLORS.textDim, letterSpacing: 4 }}>
-              EXHIBIT {ex.exhibit}
-            </span>
+      {/* One exhibit at a time — footage (or diagram) dominant, score last */}
+      {exhibits.map((ex, i) => {
+        const clipSpec = clips?.[ex.key];
+        return (
+          <Sequence key={ex.key} from={i * sub} durationInFrames={sub} name={`Exhibit-${ex.exhibit}`} layout="none">
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 28 }}>
+              {/* Exhibit tag */}
+              <span style={{ fontFamily: FONTS.mono, fontSize: 22, color: COLORS.textDim, letterSpacing: 4 }}>
+                EXHIBIT {ex.exhibit}
+              </span>
 
-            {/* Tactical reconstruction — the dominant visual */}
-            <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative" }}>
-              <TacticalBoard motif={ex.motif} label={ex.motifLabel} startFrame={0} />
+              {/* Evidence layer — real clip (V6) or procedural diagram (fallback) */}
+              <div style={{ flex: 1, minHeight: 0, border: `1px solid ${COLORS.border}`, position: "relative", overflow: "hidden" }}>
+                {clipSpec ? (
+                  <ClipEvidence
+                    src={clipSpec.src}
+                    freezeAt={clipSpec.freezeAt}
+                    annotations={clipSpec.annotations}
+                  />
+                ) : (
+                  <TacticalBoard motif={ex.motif} label={ex.motifLabel} startFrame={0} />
+                )}
+              </div>
+
+              {/* Score + evidence — delayed to fps*2.8 so it reveals AFTER freeze annotation (V5) */}
+              <ExhibitReadout
+                label={ex.label}
+                score={ex.score}
+                evidence={ex.evidence}
+                percentile={ex.percentile}
+                scoutNote={ex.scoutNote}
+                color={ex.color}
+              />
             </div>
-
-            {/* Score + evidence overlay below the board */}
-            <ExhibitReadout
-              label={ex.label}
-              score={ex.score}
-              evidence={ex.evidence}
-              percentile={ex.percentile}
-              scoutNote={ex.scoutNote}
-              color={ex.color}
-            />
-          </div>
-        </Sequence>
-      ))}
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };

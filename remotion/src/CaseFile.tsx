@@ -64,6 +64,7 @@ export const CaseFile: React.FC<ScriptData> = (props) => {
           evidence={props.beats.evidence}
           playerImageKey={props.player_image_key}
           durationFrames={beats.evidence.dur}
+          clips={props.clips}
         />
       </Sequence>
 

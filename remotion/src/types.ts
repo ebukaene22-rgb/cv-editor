@@ -33,6 +33,32 @@ export type VideoFormat =
   | "team-top-transfers"
   | "player-best-moves";
 
+// Annotation drawn on a frozen clip frame (SVG coordinate space: 0-100 wide, 0-177 tall for 9:16)
+export interface ClipAnnotation {
+  type: "circle" | "arrow" | "zone";
+  x: number;
+  y: number;
+  r?: number;     // circle radius (default 6)
+  x2?: number;    // arrow end x
+  y2?: number;    // arrow end y
+  w?: number;     // zone width
+  h?: number;     // zone height
+  label?: string;
+  color?: string; // defaults to accent red
+}
+
+export interface ClipSpec {
+  src: string;        // relative to remotion/public/, e.g. "clips/instinct.mp4"
+  freezeAt: number;   // seconds into clip to freeze for annotation
+  annotations: ClipAnnotation[];
+}
+
+export interface EpisodeClips {
+  instinct?: ClipSpec;
+  iq?: ClipSpec;
+  gravity?: ClipSpec;
+}
+
 export interface ScriptData {
   player: string;
   format: VideoFormat;
@@ -49,4 +75,6 @@ export interface ScriptData {
   // V3: planning artifact — four tweet-style lines before converting to video.
   // [hook_tweet, tension_tweet, evidence_tweet, resolution_tweet]
   thread?: string[];
+  // V6: evidence clips injected by CI after fetch_clips.py runs
+  clips?: EpisodeClips;
 }

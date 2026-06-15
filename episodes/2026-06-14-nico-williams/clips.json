@@ -1,0 +1,36 @@
+{
+  "instinct": {
+    "query": "Nico Williams sprint run behind defense goal Barcelona La Liga 2024",
+    "start": 8,
+    "end": 12,
+    "freeze_at": 1.8,
+    "annotations": [
+      { "type": "circle", "x": 50, "y": 105, "r": 7, "label": "WILLIAMS" },
+      { "type": "arrow", "x": 50, "y": 98, "x2": 50, "y2": 65 },
+      { "type": "zone", "x": 26, "y": 50, "w": 48, "h": 22, "label": "SPACE IN BEHIND" }
+    ]
+  },
+  "iq": {
+    "query": "Nico Williams lose ball tight space possession struggle low block 2024",
+    "start": 5,
+    "end": 9,
+    "freeze_at": 2.0,
+    "annotations": [
+      { "type": "circle", "x": 50, "y": 110, "r": 7, "label": "WILLIAMS" },
+      { "type": "zone", "x": 18, "y": 70, "w": 64, "h": 40, "label": "BLOCKED LANE", "color": "#888888" },
+      { "type": "circle", "x": 48, "y": 85, "r": 5, "color": "#888888" }
+    ]
+  },
+  "gravity": {
+    "query": "Nico Williams drawing defenders space teammate goal assist 2024",
+    "start": 10,
+    "end": 14,
+    "freeze_at": 1.6,
+    "annotations": [
+      { "type": "circle", "x": 35, "y": 100, "r": 7, "label": "WILLIAMS" },
+      { "type": "arrow", "x": 58, "y": 90, "x2": 42, "y2": 100, "color": "#888888" },
+      { "type": "arrow", "x": 72, "y": 95, "x2": 42, "y2": 100, "color": "#888888" },
+      { "type": "zone", "x": 60, "y": 55, "w": 32, "h": 30, "label": "SPACE CREATED" }
+    ]
+  }
+}

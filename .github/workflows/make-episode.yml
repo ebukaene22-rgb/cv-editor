@@ -34,7 +34,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: pip install requests pyyaml elevenlabs
+        run: pip install requests pyyaml elevenlabs yt-dlp
 
       - name: Install Remotion dependencies
         run: cd remotion && npm ci
@@ -112,6 +112,20 @@ jobs:
             echo "No image found for $PLAYER_NAME — video will use placeholder."
           fi
 
+      # V6: fetch 1-3s evidence clips (one per axis exhibit) from YouTube.
+      # Uses yt-dlp search — no direct URL required. Clips are cut and scaled to 9:16.
+      # If yt-dlp fails for any exhibit, that exhibit falls back to the procedural TacticalBoard.
+      - name: Fetch evidence clips
+        run: |
+          SLUG=${{ steps.slug.outputs.slug }}
+          CLIPS_JSON="episodes/$SLUG/clips.json"
+          if [ ! -f "$CLIPS_JSON" ]; then
+            echo "No clips.json — skipping clip fetch (all exhibits use TacticalBoard)"
+            exit 0
+          fi
+          mkdir -p remotion/public/clips
+          python pipeline/fetch_clips.py "$CLIPS_JSON" --out remotion/public/clips
+
       - name: Render episode video (Remotion)
         run: |
           SLUG=${{ steps.slug.outputs.slug }}
@@ -127,6 +141,21 @@ jobs:
             mkdir -p remotion/public/players
             cp "$PLAYER_IMG" remotion/public/players/${PLAYER}.png
             PROPS=$(python3 -c "import json,sys; d=json.loads(sys.argv[1]); d['player_image_key']='players/${PLAYER}.png'; print(json.dumps(d))" "$PROPS")
+          fi
+
+          # Inject clip specs for successfully fetched evidence clips (V6)
+          CLIPS_JSON="episodes/$SLUG/clips.json"
+          if [ -f "$CLIPS_JSON" ]; then
+            CLIPS_PROPS=$(python3 pipeline/clips_to_props.py "$CLIPS_JSON" remotion/public/clips)
+            if [ -n "$CLIPS_PROPS" ] && [ "$CLIPS_PROPS" != "{}" ]; then
+              PROPS=$(python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+d['clips'] = json.loads(sys.argv[2])
+print(json.dumps(d))
+" "$PROPS" "$CLIPS_PROPS")
+              echo "Clips injected into props: $(echo $CLIPS_PROPS | python3 -c 'import json,sys; print(list(json.loads(sys.stdin.read()).keys()))')"
+            fi
           fi
 
           cd remotion
