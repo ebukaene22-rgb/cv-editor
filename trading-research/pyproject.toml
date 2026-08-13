@@ -1,0 +1,22 @@
+[project]
+name = "trading-research"
+version = "0.1.0"
+description = "Pre-registered, execution-first trading research platform"
+requires-python = ">=3.11"
+# Core is intentionally dependency-free. Data-layer extras arrive in Phase 2.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# Planned Phase 2 additions (do not install until a spec needs them):
+#   pandas, pyarrow, databento, requests
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
