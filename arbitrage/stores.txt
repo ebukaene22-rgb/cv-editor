@@ -1,0 +1,16 @@
+# platform  domain                      currency  region  group
+# region drives VAT stripping (US/CA exclusive, GB/EU inclusive)
+# group ties regional storefronts of one brand together for `arb`
+
+shopify   www.allbirds.com              USD  US  allbirds
+shopify   www.allbirds.co.uk            GBP  GB  allbirds
+shopify   www.allbirds.eu               EUR  EU  allbirds
+shopify   www.allbirds.ca               CAD  CA  allbirds
+
+shopify   kith.com                      USD  US  kith
+shopify   www.deathwishcoffee.com       USD  US
+shopify   www.beardbrand.com            USD  US
+shopify   drinkolipop.com               USD  US
+shopify   www.redbullshopus.com         USD  US
+
+woo       www.tinywoodstove.com         USD  US
