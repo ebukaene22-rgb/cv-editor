@@ -1,0 +1,83 @@
+[
+  {
+    "data": [
+      {
+        "id": 11500001,
+        "title": "Shopify inventory alerts app",
+        "property_type": "saas",
+        "status": "open",
+        "sale_method": "classified",
+        "current_price": 11500,
+        "buy_it_now_price": 11500,
+        "average_revenue": 9600,
+        "average_profit": 7200,
+        "revenue_per_month": 800,
+        "profit_per_month": 600,
+        "business_model": "subscription",
+        "industry": "saas",
+        "uniques_per_month": 4200,
+        "has_verified_revenue": false,
+        "has_verified_traffic": true,
+        "seller_location": "Portugal",
+        "established_at": "2021-02-01",
+        "currency": "USD",
+        "listing_url": "https://flippa.com/11500001",
+        "summary": "Inventory low-stock alerts for Shopify merchants. Customers find us through the Shopify app store listing and organic search. 62 paying stores.",
+        "multiple": 1.2
+      },
+      {
+        "id": 11500002,
+        "title": "AI thumbnail generator",
+        "property_type": "saas",
+        "status": "open",
+        "current_price": 14000,
+        "average_revenue": 2100,
+        "revenue_per_month": 175,
+        "business_model": "subscription",
+        "industry": "ai-wrapper",
+        "uniques_per_month": 30000,
+        "has_verified_revenue": false,
+        "established_at": "2025-03-01",
+        "currency": "USD",
+        "listing_url": "https://flippa.com/11500002",
+        "summary": "Blew up after my Twitter thread went viral. 30k monthly visitors."
+      },
+      {
+        "id": 11500003,
+        "title": "SPONSORED — Enterprise logistics platform",
+        "property_type": "saas",
+        "status": "open",
+        "current_price": 480000,
+        "average_revenue": 240000,
+        "revenue_per_month": 20000,
+        "business_model": "subscription",
+        "industry": "saas",
+        "has_verified_revenue": true,
+        "established_at": "2016-01-01",
+        "currency": "USD",
+        "listing_url": "https://flippa.com/11500003",
+        "summary": "Injected outside the requested filter range. Must be re-filtered client-side."
+      },
+      {
+        "id": 11500004,
+        "title": "Agency time tracker",
+        "property_type": "saas",
+        "status": "open",
+        "current_price": 9500,
+        "average_revenue": 7800,
+        "average_profit": 6000,
+        "revenue_per_month": 650,
+        "profit_per_month": 500,
+        "business_model": "subscription",
+        "industry": "saas",
+        "uniques_per_month": 2100,
+        "has_verified_revenue": false,
+        "established_at": "2020-09-15",
+        "currency": "USD",
+        "listing_url": "https://flippa.com/11500004",
+        "summary": "Timesheets for small agencies. 21 agencies on annual plans. Growth is entirely from a Google ranking for 'agency timesheet software'.",
+        "multiple": 1.2
+      }
+    ]
+  }
+]

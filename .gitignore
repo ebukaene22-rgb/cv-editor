@@ -5,3 +5,7 @@ episodes/*/vo.mp3
 episodes/*/vo_timestamps.json
 .env
 *.local
+
+# acquisition pipeline — run artefacts and the candidate store stay local
+acquisition/data/
+acquisition/out/
