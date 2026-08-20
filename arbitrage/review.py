@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS candidates (
 );
 """
 
-AUTO_COLS = ["id", "candidate", "supply_url", "supply_gbp", "list_gbp", "markdown_pct",
+AUTO_COLS = ["id", "candidate", "supply_url", "supply_local", "supply_gbp",
+             "list_gbp", "markdown_pct",
              "est_cm_gbp", "est_roi_cost_pct", "est_cm_rev_pct",
              "active_median_gbp",
              "active_p25_gbp", "active_sellers", "stockout_signal",
@@ -272,6 +273,7 @@ def generate(conn, args, cur_ts, rates):
                f"/{sig.get('cycles',0)}cyc/{sig.get('stockouts',0)}so")
         w.writerow([cid, p["key"],
                     r["url"] or f"https://{r['domain']}",
+                    f"{r['currency']} {r['price']:.2f}",   # as the store shows it
                     f"{p['gbp']:.2f}",
                     f"{to_gbp(r['compare'], r['currency']):.2f}",
                     f"{(1 - r['price']/r['compare'])*100:.0f}",
