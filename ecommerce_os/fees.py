@@ -49,6 +49,8 @@ class FeeRule:
     price_min: Decimal | None = None
     price_max: Decimal | None = None
     schedule_version: str = "unversioned"
+    # Where this rate was read from, mirroring marketplace_fee_rule.source_ref.
+    source_ref: str | None = None
 
     def covers(self, *, price: Decimal, on_date: date) -> bool:
         if on_date < self.effective_from:
