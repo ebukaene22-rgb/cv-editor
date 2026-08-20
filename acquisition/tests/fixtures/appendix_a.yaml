@@ -1,0 +1,132 @@
+# Appendix A of the implementation brief — five listings observed in the wild,
+# each with a defect the engine must catch. This file is the acceptance gate:
+# Phase 1 is not accepted until every case below passes.
+#
+# All amounts are as the listing stated them, in the listing's own currency.
+# The suite pins USD→GBP at 0.79 so an acceptance run never depends on what the
+# ECB published today.
+
+fx:
+  USD: 0.79
+  GBP: 1.0
+
+cases:
+  - id: affiliate-content-site
+    note: "31x revenue; stated rationale claims 2x; payback ~178 years"
+    expect_disposition: reject
+    expect_rejects: [PRICE_TO_REVENUE_TOO_HIGH, CATEGORY_EXCLUDED]
+    expect_flags: []
+    listing:
+      source: flippa
+      source_id: "A1"
+      name: "Established affiliate review site"
+      category: affiliate
+      revenue_model: subscription
+      currency: USD
+      asking_price: 4997
+      ttm_revenue: 160
+      ttm_costs: 132
+      age_months: 40
+      stated_multiple: 2.0
+      has_verified_revenue: false
+      listing_text: >-
+        Turnkey affiliate site in the home fitness niche. Priced at 2x revenue,
+        a steal at this price. Traffic is organic and the content is evergreen.
+
+  - id: ai-video-app
+    note: >-
+      TTM/run-rate mismatch; API costs implausible for video inference at volume;
+      0.2% conversion. The brief lists this as a flag case; the engine also hard-
+      rejects it on the multiple (7.6x against TTM) and on ARPU, which is correct
+      — the flags are still computed and recorded on the rejected record.
+    expect_disposition: reject
+    expect_rejects: [PRICE_TO_REVENUE_TOO_HIGH]
+    expect_flags: [TREND_MISMATCH, COSTS_AMBIGUOUS, CUSTOMER_COUNT_INFLATED]
+    listing:
+      source: flippa
+      source_id: "A2"
+      name: "AI video generation app"
+      category: saas
+      revenue_model: subscription
+      currency: USD
+      asking_price: 9000
+      ttm_revenue: 1178
+      stated_arr: 5753
+      active_customers: 19800
+      paying_customers: 33
+      age_months: 26
+      has_verified_revenue: false
+      listing_text: >-
+        AI video app doing $5,753 ARR and growing. 19.8k monthly users.
+        Running costs are minimal, under $40/mo in API spend.
+
+  - id: youtube-growth-tool
+    note: >-
+      LTV implies ARPU of $576 against MRR of $470 — fewer than one customer;
+      TTM above run-rate.
+    expect_disposition: review
+    expect_rejects: []
+    expect_flags: [LTV_IMPLAUSIBLE, DECLINING, CHANNEL_RISK]
+    listing:
+      source: flippa
+      source_id: "A3"
+      name: "YouTube channel growth tool"
+      category: saas
+      revenue_model: subscription
+      currency: USD
+      asking_price: 9000
+      ttm_revenue: 7000
+      mrr: 470
+      monthly_churn: 0.08
+      stated_ltv: 7200
+      age_months: 30
+      has_verified_revenue: false
+      listing_text: >-
+        SaaS for YouTube creators. LTV is $7,200 per customer. Most of the
+        early users came from my audience — I have a channel in this niche and
+        promoted it there at launch.
+
+  - id: macos-tts-app
+    note: "Not recurring revenue; $23.5k of $24.5k from founder's own channels"
+    expect_disposition: reject
+    expect_rejects: [REVENUE_MODEL_EXCLUDED, PRICE_OUT_OF_BAND]
+    expect_flags: [CHANNEL_RISK]
+    listing:
+      source: flippa
+      source_id: "A4"
+      name: "macOS text-to-speech app"
+      category: desktop-app
+      revenue_model: pay-once
+      currency: USD
+      asking_price: 72000
+      ttm_revenue: 24588
+      age_months: 34
+      has_verified_revenue: true
+      listing_text: >-
+        One-time purchase Mac app, $29 lifetime licence. Nearly all sales came
+        from my own channels and a Product Hunt launch that hit number one.
+
+  - id: ai-video-creator
+    note: >-
+      $600x12 exceeds stated annual revenue; customer count inconsistent with
+      MRR; payback claim off by 10x
+    expect_disposition: reject
+    expect_rejects: [ARPU_BELOW_FLOOR]
+    expect_flags: [SELF_CONTRADICTORY, CUSTOMER_COUNT_INFLATED]
+    listing:
+      source: flippa
+      source_id: "A5"
+      name: "AI video creator"
+      category: saas
+      revenue_model: subscription
+      currency: USD
+      asking_price: 15000
+      ttm_revenue: 6900
+      monthly_profit: 600
+      active_customers: 1000
+      min_customer_price: 5
+      age_months: 28
+      has_verified_revenue: false
+      listing_text: >-
+        1,000 customers on plans from $5/mo. Clearing $600/mo profit,
+        so it pays for itself in about 2 years.

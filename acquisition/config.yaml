@@ -1,0 +1,61 @@
+# D1 — every threshold in the system. Nothing may be hardcoded elsewhere.
+# The buyer's tier moves over time (deal one is £5k, deal three is £25k+),
+# so raising a ceiling must never mean editing Python.
+
+budget:
+  min_price_gbp: 3000
+  max_price_gbp: 25000
+
+targets:
+  min_mrr_gbp: 150
+  min_arpu_gbp: 15
+  min_age_months: 24
+
+thresholds:
+  max_price_to_revenue: 5.0
+  max_payback_months: 60
+  min_trend_ratio: 0.9          # run_rate_arr / ttm_revenue
+  max_trend_ratio: 1.75         # inverse guard: run-rate far ABOVE trailing is a
+                                # claimed-ARR fabrication, not growth. See Appendix A case 2.
+  ltv_tolerance: 0.5            # deviation from arpu/churn before flagging
+  customer_inflation_ratio: 0.5 # mrr / (customers * min_price) below this = inflated
+  min_customer_price_gbp: 5.0   # fallback entry price when a listing states none
+
+audience:
+  vertical: ""                  # set once, e.g. "shopify-merchants"
+  keywords: []
+
+exclusions:
+  categories: [content-site, affiliate, chrome-extension, mobile-app, ai-wrapper]
+  revenue_models: [one-time, pay-once, lifetime-deal]
+  platforms: [single-app-store]
+
+scoring:
+  flag_penalty: 8               # subtracted per flag raised
+  verification_bonus: 15        # processor-verified revenue (Flippa verified or TrustMRR match)
+  fit:
+    base: 50
+    trend_weight: 20            # + up to 20 for trend_ratio at/above 1.0
+    payback_weight: 20          # + up to 20 as payback_months approaches 0
+    multiple_weight: 20         # + up to 20 as price_to_revenue approaches 0
+    age_weight: 10              # + up to 10 for age beyond the minimum
+    vertical_match_bonus: 15    # audience.keywords appear in the listing text
+
+neglect:                        # D3 — WordPress.org off-market band
+  min_active_installs: 1000
+  min_months_since_update: 18
+  min_rating: 3.5
+  abandonment_divisor: 18       # months_since_last_update / this
+  max_pages: 40                 # 100 per page; politeness ceiling per run
+
+run:
+  currency: GBP
+  fx_source: "ECB daily reference rates"
+  fx_cache_hours: 24
+  request_delay_seconds: 1.5    # back off politely; this is a weekly-cadence system
+  user_agent: "micro-saas-acquisition-pipeline/1.0 (personal deal sourcing)"
+
+paths:
+  store: data/candidates.json
+  neglect_store: data/neglect.json
+  out_dir: out
