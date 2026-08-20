@@ -84,10 +84,46 @@ def now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def clean_title(title):
+    """
+    Reduce a storefront title to its commercial core -- the tokens a buyer
+    would actually type. Discovered the hard way: passing the raw title
+    ("Gymshark | Be a visionary. Gymshark VItal Warm Leggings - Base Green
+    Marl") to Product Research returns zero sold results every time. The
+    tagline, duplicated brand, and colourway all have to go.
+    """
+    t = title or ""
+    # store prefix/suffix segments around pipes: keep the longest segment
+    if "|" in t:
+        t = max(t.split("|"), key=len)
+    # marketing sentences: keep what follows the last full stop that has
+    # text after it ("Be a visionary. Gymshark Vital ..." -> "Gymshark
+    # Vital ...") -- but don't split decimals or initials
+    parts = [p.strip() for p in re.split(r"(?<=[a-z])\.\s+", t) if p.strip()]
+    if len(parts) > 1:
+        t = parts[-1]
+    # variant/colour tails: after "/" and the final " - Colour" segment
+    t = re.sub(r"\s*/\s*[^/]*$", "", t)
+    if " - " in t:
+        t = t.rsplit(" - ", 1)[0]
+    t = re.sub(r"[^\w\s-]", " ", t)
+    return t
+
+
 def product_key(row):
-    q = re.sub(r"\s*/\s*[^/]*$", "", row["title"] or "")
-    q = re.sub(r"[^\w\s-]", " ", q)
-    return " ".join(([row["vendor"]] if row["vendor"] else []) + q.split())[:80]
+    t = clean_title(row["title"])
+    words = (row["vendor"] or "").split() + t.split()
+    # dedupe repeated tokens case-insensitively, preserve order (kills the
+    # "Gymshark ... Gymshark ..." duplication), cap at 7 tokens
+    seen, out = set(), []
+    for w in words:
+        k = w.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(w)
+        if len(out) == 7:
+            break
+    return " ".join(out)[:80]
 
 
 def terapeak_url(query):
@@ -95,6 +131,42 @@ def terapeak_url(query):
     return ("https://www.ebay.co.uk/sh/research?" + urllib.parse.urlencode(
         {"marketplace": "EBAY-GB", "keywords": query, "dayRange": "90",
          "tabName": "SOLD"}))
+
+
+CAND_CSV = "history/candidates.csv"
+
+
+def dump_candidates(conn):
+    """
+    Mirror the candidates table (frozen features + labels) to a committed
+    CSV. prices.db is ephemeral and gitignored; the labeled dataset is the
+    whole point of this module, so it must survive the container.
+    """
+    import os
+    os.makedirs("history", exist_ok=True)
+    cur = conn.execute("SELECT * FROM candidates ORDER BY id")
+    cols = [d[0] for d in cur.description]
+    with open(CAND_CSV, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        w.writerows(cur)
+
+
+def load_candidates(conn):
+    """Restore the candidates table from the committed CSV, if present."""
+    import os
+    conn.executescript(SCHEMA)
+    if not os.path.exists(CAND_CSV):
+        return 0
+    with open(CAND_CSV, newline="") as f:
+        rd = csv.DictReader(f)
+        cols = rd.fieldnames
+        rows = [[r[c] if r[c] != "" else None for c in cols] for r in rd]
+    conn.executemany(
+        f"INSERT OR IGNORE INTO candidates ({','.join(cols)}) "
+        f"VALUES ({','.join('?' * len(cols))})", rows)
+    conn.commit()
+    return len(rows)
 
 
 # ------------------------------------------------------------------ review
@@ -204,8 +276,10 @@ def generate(conn, args, cur_ts, rates):
                     f"{med:.2f}", f"{p25:.2f}", c["n"], stk, cat,
                     r["domain"], p["key"], terapeak_url(p["key"]),
                     "", "", "", ""])
+    dump_candidates(conn)
     syn = "  [SYNTHETIC COMPS]" if ec.synthetic else ""
     print(f"wrote {len(out)} candidates -> {args.out}{syn}")
+    print(f"frozen features mirrored to {CAND_CSV} -- commit it")
     _, _, probe = F.Economics(seller_country=args.seller_country,
                               vat_registered=args.vat_registered
                               ).contribution(10, 20, 500)
@@ -263,7 +337,9 @@ def ingest(conn, path):
                 errors.append(f"  line {i}: id {cid} not in candidates")
                 bad += 1
     conn.commit()
+    dump_candidates(conn)
     print(f"labeled {ok} rows  ({blank} left blank, {bad} rejected)")
+    print(f"labels mirrored to {CAND_CSV} -- commit it")
     for e in errors[:10]:
         print(e)
 

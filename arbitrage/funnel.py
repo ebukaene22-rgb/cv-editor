@@ -32,10 +32,7 @@ def pct(xs, p):
     return xs[lo] + (xs[hi] - xs[lo]) * (k - lo)
 
 
-def product_key(row):
-    q = re.sub(r"\s*/\s*[^/]*$", "", row["title"] or "")   # strip variant tail
-    q = re.sub(r"[^\w\s-]", " ", q)
-    return " ".join(([row["vendor"]] if row["vendor"] else []) + q.split())[:80]
+from review import product_key  # shared: funnel and review must agree on identity
 
 
 def run(conn, args, cur_ts, rates):

@@ -385,13 +385,17 @@ def cmd_review(args):
 def cmd_ingest(args):
     """Read a filled review sheet back in as labels."""
     import review as RV
-    RV.ingest(db(), args.file)
+    conn = db()
+    RV.load_candidates(conn)      # container is ephemeral; restore first
+    RV.ingest(conn, args.file)
 
 
 def cmd_labels(args):
     """What the labeled dataset says so far."""
     import review as RV
-    RV.report(db())
+    conn = db()
+    RV.load_candidates(conn)
+    RV.report(conn)
 
 
 
