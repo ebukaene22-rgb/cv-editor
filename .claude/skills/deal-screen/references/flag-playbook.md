@@ -102,17 +102,38 @@ Then compute what that becomes at 3× volume.
 ---
 
 ## `UNVERIFIED`
-**Fires when** there is no verified revenue figure and no agreeing TrustMRR match.
+**Fires when** there is no verified revenue figure and no TrustMRR match at all.
 
 Below $50k, Flippa does not verify. This is the **default state**, not an
 accusation — nearly every candidate in this tier carries it. What it means is
-that nothing on the page has independent support yet.
+that nobody has checked yet.
 
 **Ask:** read-only processor access, or a live screen-share of the dashboard.
 
 **Stop if:** refused with no reason given. Ask once, plainly: *"Is there a reason
 you'd rather not share processor data directly?"* A good reason exists
 occasionally. Usually the refusal is the answer.
+
+---
+
+## `VERIFICATION_CONTRADICTED`
+**Fires when** TrustMRR reports a figure that disagrees with the listing's own.
+
+Not a stronger `UNVERIFIED` — the opposite kind of finding. `UNVERIFIED` means
+nobody has checked. This means somebody has, and the listing lost. It carries
+its own heavy score penalty for that reason: scored as one ordinary flag, a
+contradicted listing outranked listings nobody had looked at, which is exactly
+backwards.
+
+Innocent explanations exist and are worth one question: a second processor, a
+figure quoted gross of fees, a profile that has gone stale since the listing was
+written. Each of those is specific and answerable in a sentence.
+
+**Ask:** which figure is right, and why the other one is there. Then get the
+processor export regardless of the answer.
+
+**Stop if:** the explanation is vague, or arrives only after you name the
+discrepancy. A seller with a second processor knows they have one.
 
 ---
 

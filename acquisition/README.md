@@ -211,8 +211,8 @@ is answerable a month later.
 ### Flags — surfaced, never auto-rejecting
 
 `DECLINING` · `TREND_MISMATCH` · `LTV_IMPLAUSIBLE` · `CUSTOMER_COUNT_INFLATED` ·
-`SELF_CONTRADICTORY` · `COSTS_AMBIGUOUS` · `UNVERIFIED` · `CHANNEL_RISK` ·
-`LOSS_MAKING` · `DATA_INCOMPLETE`
+`SELF_CONTRADICTORY` · `COSTS_AMBIGUOUS` · `UNVERIFIED` ·
+`VERIFICATION_CONTRADICTED` · `CHANNEL_RISK` · `LOSS_MAKING` · `DATA_INCOMPLETE`
 
 Each records the arithmetic that fired it plus the evidence. See
 `.claude/skills/deal-screen/references/flag-playbook.md` for what each one means

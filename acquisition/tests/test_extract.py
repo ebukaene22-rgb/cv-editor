@@ -55,6 +55,15 @@ READS = [
     ("Lifetime value of $3,000 per customer.",
      {"stated_ltv": 3000},
      "a money amount reads as an LTV, never as a customer count"),
+    ("Costs are low, around $90/mo for the SERP API.",
+     {"stated_monthly_costs": 90},
+     "a stated running cost is read as a cost"),
+    ("Running costs are minimal, under $40/mo in API spend.",
+     {"stated_monthly_costs": 40},
+     "cost word after the amount also counts"),
+    ("Hosting runs $200 a month on Hetzner.",
+     {"stated_monthly_costs": 200},
+     "'a month' phrasing is read"),
 ]
 
 # Things that must NOT be read as anything.
@@ -64,14 +73,12 @@ REFUSALS = [
      "reviews and downloads are not customers"),
     ("Priced at 2x revenue. $4,997 asking. 900 monthly uniques.",
      "an asking price is not an entry price and uniques are not customers"),
-    ("Costs around $90/mo for the SERP API.",
-     "a stated cost is not a plan price"),
-    ("Hosting runs $40/mo on Hetzner.", "hosting spend is not a plan price"),
+    ("Clearing $600/mo profit on this one.", "a profit figure is neither a cost nor a price"),
     ("No numbers here at all.", "prose with no figures yields nothing"),
 ]
 
 FIELDS = ("active_customers", "paying_customers", "monthly_churn",
-          "stated_ltv", "min_customer_price")
+          "stated_ltv", "min_customer_price", "stated_monthly_costs")
 
 
 def expect(condition: bool, name: str, detail: str = "") -> None:
@@ -161,10 +168,54 @@ def test_rules_now_fire() -> None:
            "CHANNEL_RISK still fires alongside", str(ltv.flag_names()))
 
 
+def test_costs_flag_evidence() -> None:
+    """A flag whose evidence is wrong is a flag nobody trusts."""
+    from acq.classify import HeuristicClassifier
+    from acq.config import Config
+    from acq.fx import FixedRates
+    from acq.normalise import normalise
+    from acq.rules import RuleEngine
+
+    fx = FixedRates({"USD": 0.79, "GBP": 1.0})
+    engine = RuleEngine(Config.load(), classifier=HeuristicClassifier())
+
+    base = {"id": 3, "title": "Rank tracker", "industry": "saas",
+            "business_model": "subscription", "current_price": 16000,
+            "average_revenue": 13200, "revenue_per_month": 1100,
+            "established_at": "2021-11-01", "currency": "USD"}
+
+    stated = normalise(FlippaSource.to_listing(
+        dict(base, summary="White-label rank tracking. Costs are low, around "
+                           "$90/mo for the SERP API.")), fx)
+    engine.screen(stated)
+    costs = next(f for f in stated.flags if f["flag"] == "COSTS_AMBIGUOUS")
+    expect("no cost figure stated" not in costs["trigger"],
+           "does not claim 'no cost figure stated' when one is stated in prose",
+           costs["trigger"])
+    expect("prose" in costs["trigger"] and "71" in costs["trigger"],
+           "the flag quotes the prose cost it found, converted to GBP",
+           costs["trigger"])
+    expect("margin" in costs["evidence"],
+           "the evidence gives the margin that figure implies", costs["evidence"])
+
+    silent = normalise(FlippaSource.to_listing(
+        dict(base, summary="White-label rank tracking for agencies.")), fx)
+    engine.screen(silent)
+    quiet = next(f for f in silent.flags if f["flag"] == "COSTS_AMBIGUOUS")
+    expect(quiet["trigger"] == "no cost figure stated",
+           "still says so plainly when no cost is stated anywhere", quiet["trigger"])
+
+    expect(stated.ttm_costs is None,
+           "a prose cost never becomes ttm_costs, so it cannot drive a hard reject")
+    expect(stated.payback_months is None,
+           "payback stays uncomputable rather than resting on a prose figure")
+
+
 def main() -> int:
     print("PROSE EXTRACTION — figures the endpoint does not return")
     print("=" * 72)
-    for fn in (test_reads, test_refusals, test_provenance_and_precedence, test_rules_now_fire):
+    for fn in (test_reads, test_refusals, test_provenance_and_precedence,
+               test_rules_now_fire, test_costs_flag_evidence):
         fn()
 
     failed = 0

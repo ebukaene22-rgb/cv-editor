@@ -36,7 +36,7 @@ def verification_label(c: Candidate) -> str:
     if c.trustmrr_match == "agrees":
         return "TrustMRR agrees"
     if c.trustmrr_match == "disagrees":
-        return "TrustMRR DISAGREES"
+        return "CONTRADICTED by TrustMRR"
     if c.has_verified_revenue:
         return "listing verified"
     return "unverified"

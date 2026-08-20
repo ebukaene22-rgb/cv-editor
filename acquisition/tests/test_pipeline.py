@@ -118,8 +118,33 @@ def test_cross_check(cfg: Config) -> None:
     engine.screen_all(candidates)
     expect("UNVERIFIED" not in by_id["11500001"].flag_names(),
            "an agreeing TrustMRR match clears UNVERIFIED")
-    expect("UNVERIFIED" in by_id["11500004"].flag_names(),
-           "a disagreeing match does not clear UNVERIFIED")
+    expect("VERIFICATION_CONTRADICTED" in by_id["11500004"].flag_names(),
+           "a disagreeing match raises its own flag, not UNVERIFIED",
+           str(by_id["11500004"].flag_names()))
+    expect("UNVERIFIED" not in by_id["11500004"].flag_names(),
+           "a contradicted listing is not merely 'unverified' — somebody did check")
+
+    # The ordering this exists to protect, with the verification status as the
+    # only variable: the same listing, checked-and-wrong vs never-checked vs
+    # checked-and-right.
+    import copy
+
+    def rescore(source, match, verified_mrr=None):
+        c = copy.deepcopy(source)
+        c.trustmrr_match, c.trustmrr_mrr = match, verified_mrr
+        engine.screen(c)
+        return c.score
+
+    subject = by_id["11500001"]
+    agrees = rescore(subject, "agrees", 639.9)
+    unchecked = rescore(subject, "none")
+    contradicted = rescore(subject, "disagrees", 158.0)
+    expect(contradicted < unchecked < agrees,
+           "contradicted < never checked < verified, all else equal",
+           f"contradicted {contradicted}, unchecked {unchecked}, agrees {agrees}")
+    expect(unchecked - contradicted > agrees - unchecked,
+           "being contradicted costs more than never being checked gains",
+           f"contradiction -{unchecked - contradicted}, verification +{agrees - unchecked}")
 
 
 def test_screening(cfg: Config) -> list[Candidate]:

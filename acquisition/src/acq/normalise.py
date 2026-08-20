@@ -14,7 +14,7 @@ from .models import Candidate, Listing
 
 MONEY_FIELDS = (
     "asking_price", "ttm_revenue", "ttm_costs", "mrr", "monthly_profit",
-    "stated_ltv", "stated_arr", "min_customer_price",
+    "stated_ltv", "stated_arr", "min_customer_price", "stated_monthly_costs",
 )
 
 

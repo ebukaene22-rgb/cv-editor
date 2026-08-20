@@ -26,6 +26,18 @@ seller and expensive for a dishonest one.
 3. **Where the last 20 customers came from.** Harder to fabricate than any
    aggregate, and it is the real answer to the channel question.
 
+## When TrustMRR contradicts the listing
+
+The pipeline flags this as `VERIFICATION_CONTRADICTED`, separately from
+`UNVERIFIED`, because they are opposite findings: one means nobody checked, the
+other means somebody did and the numbers did not match.
+
+Treat it as the first question of the conversation, not a negotiating point held
+back for later. Ask which figure is right and why the other exists. The innocent
+answers — second processor, gross vs net of fees, a stale profile — are all
+specific and immediate. A vague answer, or one that only appears after you point
+at the gap, is the finding.
+
 ## Reconciliation
 
 Every number the seller gave must agree with its primary source. Build the table

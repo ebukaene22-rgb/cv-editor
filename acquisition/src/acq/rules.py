@@ -29,6 +29,7 @@ CUSTOMER_COUNT_INFLATED = "CUSTOMER_COUNT_INFLATED"
 SELF_CONTRADICTORY = "SELF_CONTRADICTORY"
 COSTS_AMBIGUOUS = "COSTS_AMBIGUOUS"
 UNVERIFIED = "UNVERIFIED"
+VERIFICATION_CONTRADICTED = "VERIFICATION_CONTRADICTED"   # addition — see rule_verification
 CHANNEL_RISK = "CHANNEL_RISK"
 DATA_INCOMPLETE = "DATA_INCOMPLETE"              # addition — see design rule 1
 LOSS_MAKING = "LOSS_MAKING"                      # addition — negative profit
@@ -229,10 +230,24 @@ class RuleEngine:
                            hit.evidence)
 
     def rule_costs(self, c: Candidate) -> None:
-        """A single cost figure, no cost figure, or a margin inference won't survive."""
+        """A single cost figure, no cost figure, or a margin inference won't survive.
+
+        The brief's wording is "single cost figure, no period". Both are the same
+        flag but not the same evidence, and saying "no cost figure stated" about a
+        listing that states one in prose is the kind of wrong detail that stops a
+        human trusting the flag at all.
+        """
         if c.ttm_costs is None and c.annual_revenue is not None:
-            self._flag(c, COSTS_AMBIGUOUS, "no cost figure stated",
-                       "margin is unknown; ask for 3 months of hosting/API invoices")
+            if c.stated_monthly_costs:
+                implied = c.annual_revenue - c.stated_monthly_costs * 12
+                margin = implied / c.annual_revenue
+                self._flag(c, COSTS_AMBIGUOUS,
+                           f"costs given only as prose: £{c.stated_monthly_costs:,.0f}/mo",
+                           f"one unitemised figure implying a {margin:.0%} margin. Not a cost "
+                           f"breakdown — ask for 3 months of hosting/API invoices")
+            else:
+                self._flag(c, COSTS_AMBIGUOUS, "no cost figure stated",
+                           "margin is unknown; ask for 3 months of hosting/API invoices")
             return
 
         blob = f"{c.name} {c.category} {c.listing_text}".lower()
@@ -246,13 +261,31 @@ class RuleEngine:
                                "survive growth")
 
     def rule_verification(self, c: Candidate) -> None:
-        """Flippa does not verify below $50k. Assume nothing."""
+        """Flippa does not verify below $50k. Assume nothing.
+
+        Two findings that must never share a flag. `UNVERIFIED` means nobody has
+        checked — the default state in this tier and true of nearly every
+        candidate. `VERIFICATION_CONTRADICTED` means somebody has checked and the
+        listing lost. Scored the same, a listing the processor contradicts
+        outranks two listings nobody has looked at, which is exactly backwards.
+        """
+        if c.trustmrr_match == "disagrees":
+            stated = f"£{c.mrr:,.0f}" if c.mrr is not None else "the listing's figure"
+            verified = f"£{c.trustmrr_mrr:,.0f}" if c.trustmrr_mrr is not None else "a different figure"
+            gap = ""
+            if c.mrr and c.trustmrr_mrr:
+                gap = f" — the processor reports {c.trustmrr_mrr / c.mrr:.0%} of what is claimed"
+            self._flag(c, VERIFICATION_CONTRADICTED,
+                       f"TrustMRR reports {verified} MRR against {stated} stated",
+                       f"a processor-backed figure contradicts the listing{gap}. Treat every "
+                       f"other number on the page as unsupported and ask why before anything else")
+            return
+
         if c.has_verified_revenue or c.trustmrr_match == "agrees":
             return
-        detail = ("processor-verified figure disagrees with the listing"
-                  if c.trustmrr_match == "disagrees"
-                  else "no verified revenue and no TrustMRR match")
-        self._flag(c, UNVERIFIED, "has_verified_revenue == false", detail)
+        self._flag(c, UNVERIFIED, "has_verified_revenue == false",
+                   "no verified revenue and no TrustMRR match — the default state below "
+                   "$50k, not a finding about this listing in particular")
 
     def rule_channel(self, c: Candidate) -> None:
         """Is the acquisition channel an account, a ranking, or a person?"""
@@ -289,6 +322,7 @@ class RuleEngine:
         SELF_CONTRADICTORY: ("price_to_revenue",),
         COSTS_AMBIGUOUS: ("annual_revenue",),
         UNVERIFIED: (),
+        VERIFICATION_CONTRADICTED: (),
         CHANNEL_RISK: ("listing_text",),
     }
 
@@ -332,6 +366,10 @@ class RuleEngine:
     def score(self, c: Candidate) -> float:
         c.fit_score = self.fit(c)
         penalty = self.cfg["scoring.flag_penalty"] * len(c.flags)
+        if VERIFICATION_CONTRADICTED in c.flag_names():
+            # A flat per-flag penalty cannot express "somebody checked and the
+            # listing lost", so this one carries its own weight on top.
+            penalty += self.cfg.get("scoring.contradiction_penalty", 45)
         bonus = (self.cfg["scoring.verification_bonus"]
                  if (c.has_verified_revenue or c.trustmrr_match == "agrees") else 0)
         c.score = round(c.fit_score - penalty + bonus, 2)

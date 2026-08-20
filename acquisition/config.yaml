@@ -33,6 +33,10 @@ exclusions:
 scoring:
   flag_penalty: 8               # subtracted per flag raised
   verification_bonus: 15        # processor-verified revenue (Flippa verified or TrustMRR match)
+  contradiction_penalty: 45     # TrustMRR reports a figure that disagrees with the listing.
+                                # Not the same finding as "no verified data" and must not
+                                # score like it: no data means nobody has checked, whereas a
+                                # disagreement means somebody has and the listing lost.
   fit:
     base: 50
     trend_weight: 20            # + up to 20 for trend_ratio at/above 1.0

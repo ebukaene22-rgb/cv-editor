@@ -35,6 +35,7 @@ class Listing:
     stated_ltv: float | None = None
     stated_arr: float | None = None         # the seller's own "ARR" claim
     min_customer_price: float | None = None
+    stated_monthly_costs: float | None = None   # from prose; never feeds a hard reject
     age_months: float | None = None
     uniques_per_month: float | None = None
 
@@ -70,6 +71,7 @@ class Candidate:
     stated_ltv: float | None = None
     stated_arr: float | None = None
     min_customer_price: float | None = None
+    stated_monthly_costs: float | None = None
 
     active_customers: float | None = None
     paying_customers: float | None = None
