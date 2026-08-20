@@ -170,10 +170,12 @@ def cmd_weekly(args) -> int:
     cfg = load_config(args)
     engine = engine_for(cfg, args)
 
+    failed_pulls: list[str] = []
     if not args.no_pull:
         for name, fn in (("marketplace", cmd_marketplace), ("neglect", cmd_neglect)):
             print(f"\n── {name} ──")
             if fn(args) != 0:
+                failed_pulls.append(name)
                 print(f"WARN {name} pull failed; continuing with stored data")
 
     store = candidate_store(cfg)
@@ -202,6 +204,14 @@ def cmd_weekly(args) -> int:
     packs = [diligence.write(c, out_dir(cfg) / "diligence")
              for c in candidates if c.status in PROMOTED_STAGES]
     print(f"D8 diligence packs  → {len(packs)} generated for promoted candidates")
+
+    # A short list after a failed pull is not a quiet week, and the two must
+    # never look alike in the summary a human skims.
+    if failed_pulls:
+        print(f"\nWARN this run is INCOMPLETE — {' and '.join(failed_pulls)} did not "
+              f"return data. The sheet reflects stored data only; do not read a short "
+              f"shortlist as a quiet week.")
+        return 1
     return 0
 
 
