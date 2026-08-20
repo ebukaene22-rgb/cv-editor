@@ -359,6 +359,75 @@ def cmd_stores(args):
     print(f"\n{ok} reachable")
 
 
+
+def cmd_score(args):
+    """Rank supply-side candidates by margin x velocity / competition."""
+    import comp as C
+    conn = db()
+    cur, _ = latest_two(conn)
+    if not cur:
+        sys.exit("no snapshots yet")
+    rates = fx_rates(conn)
+    fees = C.Fees(marketplace_pct=args.fee, duty_pct=args.duty,
+                  ship_per_kg=args.ship_kg)
+    ec = C.EbayComp(conn, synthetic=args.synthetic)
+    if ec.synthetic:
+        print("!! SYNTHETIC COMPS - no EBAY_CLIENT_ID/SECRET in env.\n"
+              "   Fee model and ranking are exercised; prices are stubs.\n")
+
+    rows = conn.execute("""
+        SELECT domain, region, sku, title, vendor, price, compare, currency,
+               grams
+        FROM obs
+        WHERE ts=? AND available=1 AND price > 0
+              AND compare IS NOT NULL AND compare > price
+        ORDER BY (1 - price/compare) DESC LIMIT ?""",
+        (cur, args.candidates * 12)).fetchall()
+
+    # One comp per PRODUCT, not per variant: sizes of one shoe are one trade
+    # and one lookup. Keep the cheapest in-stock variant as the buy leg.
+    best = {}
+    for r in rows:
+        q = re.sub(r"\s*/\s*[^/]*$", "", r["title"])          # drop variant tail
+        q = re.sub(r"[^\w\s-]", " ", q)
+        q = " ".join(([r["vendor"]] if r["vendor"] else []) + q.split())[:80]
+        k = (r["domain"], q.lower())
+        rate = rates.get(r["currency"]) or 1.0
+        buy_usd = r["price"] / rate
+        if k not in best or buy_usd < best[k][0]:
+            best[k] = (buy_usd, q, r)
+
+    out = []
+    for buy_usd, q, r in best.values():
+        c = ec.lookup(q, region=r["region"] or "US")
+        if not c:
+            continue
+        sell_usd = c["median"] / (rates.get(c["currency"]) or 1.0)
+        m, cost, net = fees.margin(buy_usd, sell_usd, r["grams"])
+        st = C.sell_through(conn, r["domain"], r["sku"])
+        out.append((C.score_row(m, st, c["n"]), m, st, c, buy_usd, sell_usd,
+                    cost, net, r))
+        time.sleep(args.delay)
+
+    out.sort(key=lambda x: -x[0])
+    out = [o for o in out if o[1] is not None and o[1] >= args.min_margin]
+    tag = " [SYNTHETIC]" if ec.synthetic else ""
+    print(f"ranked candidates{tag}  fees={args.fee:.1%} duty={args.duty:.0%}"
+          f"  ({cur})\n")
+    print(f"{'SCORE':>6} {'MARGIN':>7} {'VELOC':>6} {'COMP':>6}  "
+          f"{'BUY$':>7} {'LANDED':>7} {'SELL$':>7} {'NET$':>7}  PRODUCT")
+    print("-" * 118)
+    for s, m, st, c, buy, sell, cost, net, r in out[:args.limit]:
+        v = "  n/a" if st is None else f"{st*100:5.0f}%"
+        print(f"{s:6.2f} {m*100:6.0f}% {v:>6} {c['n']:6,}  "
+              f"{buy:7.2f} {cost:7.2f} {sell:7.2f} {net:7.2f}  "
+              f"{r['title'][:36]}")
+    print(f"\n{len(out)} of {len(best)} products clear {args.min_margin:.0%} margin  |  "
+          f"api calls={ec.calls} cache hits={ec.cache_hits}")
+    if ec.synthetic:
+        print("Comps are synthetic - do not trade on these numbers.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -369,6 +438,16 @@ def main():
     s = sub.add_parser("arb"); s.add_argument("--group"); s.add_argument("--min", type=float, default=25); s.add_argument("--limit", type=int, default=40); s.set_defaults(fn=cmd_arb)
     s = sub.add_parser("new"); s.add_argument("--limit", type=int, default=40); s.set_defaults(fn=cmd_new)
     s = sub.add_parser("stores"); s.set_defaults(fn=cmd_stores)
+    s = sub.add_parser("score")
+    s.add_argument("--candidates", type=int, default=60, help="supply-side rows to comp")
+    s.add_argument("--limit", type=int, default=25)
+    s.add_argument("--min-margin", type=float, default=0.15)
+    s.add_argument("--fee", type=float, default=0.132, help="marketplace fee rate")
+    s.add_argument("--duty", type=float, default=0.0, help="import duty rate")
+    s.add_argument("--ship-kg", type=float, default=9.0)
+    s.add_argument("--delay", type=float, default=0.25)
+    s.add_argument("--synthetic", action="store_true", help="force stub comps")
+    s.set_defaults(fn=cmd_score)
     a = ap.parse_args()
     a.fn(a)
 

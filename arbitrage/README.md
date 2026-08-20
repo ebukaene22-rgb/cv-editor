@@ -68,7 +68,7 @@ Real demand, not asking price. Needs two snapshots; the query is verified.
 
 ## Usage
 
-Stdlib only, no dependencies.
+Python 3.9+, stdlib only, no dependencies, no install step.
 
 ```bash
 python3 scan.py stores              # probe which endpoints still serve data
@@ -77,6 +77,13 @@ python3 scan.py arb --group allbirds --min 25
 python3 scan.py clearance --min 45
 python3 scan.py sellout             # needs 2+ snapshots
 python3 scan.py new
+python3 scan.py score --synthetic   # rank; drop --synthetic with a keyset
+```
+
+Daily collection:
+
+```cron
+17 6 * * *  cd /path/to/arbitrage && /usr/bin/python3 scan.py snapshot >> scan.log 2>&1
 ```
 
 `stores.txt` is `platform  domain  currency  region  group` — `region` drives VAT
@@ -105,8 +112,60 @@ commodity, and the accumulated series is what nobody else has.
   real use is one supplier catalogue against a different resale venue — which is
   why the sell-side comp needs an API key.
 
+## The comp layer (`comp.py`)
+
+Supply-side scanning says what is cheap and what is moving. `score` answers the
+other half — what it resells for, and how crowded that resale is.
+
+**Sold-price data is not obtainable for free, and this is worth being precise
+about.** eBay's sold comps live in the Marketplace Insights API (90-day sales
+history), which is a Limited Release keyset that eBay does not currently grant
+to new applicants. The free Browse API returns *active listings only and
+explicitly no sold data*. The sold-listing web UI (`LH_Sold=1`) does show it,
+but 403s from a datacenter IP. So "what it actually sold for" is off the table
+without a paid provider (Keepa for Amazon history) or residential proxies.
+
+That is survivable, because velocity does not have to come from eBay:
+
+| Term | Source |
+|---|---|
+| resale price | eBay Browse API — median **asking** price, free keyset |
+| competition | Browse `total` — active listings for the query, free |
+| **velocity** | **our own time series** — `available` 1→0 flips from `sellout` |
+
+A variant flipping out of stock is a real unit leaving a real shelf. That is a
+better demand signal than an asking price anyway, and it is the part nobody
+can sell you — it only exists if you have been polling.
+
+Ranking is `margin × velocity ÷ log(e + competitors)`. Competition is damped
+because the 40th seller hurts far less than the 4th. Velocity is unknown until
+a second snapshot exists and is treated as a neutral 0.5 rather than 0, or
+every candidate would score zero on day one.
+
+Margin runs through a deliberately pessimistic fee model (`comp.Fees`):
+marketplace fee 13.2%, payment 2.9% + $0.30, shipping derived from the `grams`
+field, configurable duty, 6% return rate. A gap that only clears an optimistic
+fee model is not a trade.
+
+```bash
+export EBAY_CLIENT_ID=...  EBAY_CLIENT_SECRET=...   # free keyset
+python3 scan.py score --min-margin 0.25 --duty 0.12
+python3 scan.py score --synthetic                   # no keyset: stub comps
+```
+
+Comps are cached for 6 h and looked up **once per product, not per variant** —
+eight sizes of one shoe are one trade and one call. That keeps a scan inside
+the free 5,000 calls/day quota.
+
+Without credentials `score` runs `--synthetic`: deterministic stub comps so the
+fee model and ranking are still exercisable. Those rows are labelled and must
+not be traded on.
+
 ## Next
 
-Wire a resale comp onto the shortlist: eBay Browse API (free key) for sold
-comps, or Keepa for Amazon price history. Score `margin × sell-through ×
-1/competitor_count` and alert only on the top of that, rather than on raw gap.
+- Swap the Browse median for a real sold-comp source if a Keepa key or an
+  approved Insights keyset becomes available — the `EbayComp.lookup` contract
+  (`median`, `p25`, `n`) is what the scorer depends on, so it is a drop-in.
+- Per-lane duty rates rather than one global `--duty`.
+- Alert on rank changes rather than absolute rank, once the series is long
+  enough for that to mean anything.
