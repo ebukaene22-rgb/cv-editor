@@ -77,7 +77,7 @@ python3 scan.py arb --group allbirds --min 25
 python3 scan.py clearance --min 45
 python3 scan.py sellout             # needs 2+ snapshots
 python3 scan.py new
-python3 scan.py score --synthetic   # rank; drop --synthetic with a keyset
+python3 scan.py funnel --synthetic  # survival funnel; drop --synthetic with a keyset
 ```
 
 Daily collection:
@@ -137,29 +137,81 @@ A variant flipping out of stock is a real unit leaving a real shelf. That is a
 better demand signal than an asking price anyway, and it is the part nobody
 can sell you — it only exists if you have been polling.
 
-Ranking is `margin × velocity ÷ log(e + competitors)`. Competition is damped
-because the 40th seller hurts far less than the 4th. Velocity is unknown until
-a second snapshot exists and is treated as a neutral 0.5 rather than 0, or
-every candidate would score zero on day one.
+## Economics (`fees.py`)
 
-Margin runs through a deliberately pessimistic fee model (`comp.Fees`):
-marketplace fee 13.2%, payment 2.9% + $0.30, shipping derived from the `grams`
-field, configurable duty, 6% return rate. A gap that only clears an optimistic
-fee model is not a trade.
+The original fee model (flat 13.2% + separate 2.9% + $0.30 payment fee) was
+wrong in three ways at once: it charged a payment-processing fee that eBay's
+managed payments folds into the FVF (inflating costs), used one universal FVF
+where business rates are category-dependent 6.9%–14.9% (wrong in either
+direction), and ignored VAT on fees, the 0.35% regulatory operating fee,
+international fees, and FVF-on-postage (understating costs). Biased both ways
+is worse than pessimistic — it can't be corrected for.
+
+The replacement computes contribution per order:
+
+```
+CM = Revenue − SupplierCost − InboundShip − Duty − OutboundShip
+   − FVF(category) − PerOrderFee(£0.30/£0.40) − RegFee(0.35%)
+   − IntlFee(region) − AdFee − VAT-on-fees(if unregistered)
+   − ExpectedReturnCost
+```
+
+Margin is reported **on invested cost** (decides working-capital recycle
+speed), not on revenue. `fees.categorise()` maps titles into FVF bands,
+falling back to the *higher* default band when unsure.
+
+## Availability telemetry (`signals.py`)
+
+An `available` 1→0 flip does **not** mean a sale — it can be a manual edit, a
+withdrawal, a reallocation, or a feed change. So nothing here is called
+sell-through. The measured quantity is **availability depletion**:
+
+- one 1→0 flip = weak evidence (indistinguishable from withdrawal)
+- a **replenishment cycle** (0→1→0) = strong evidence — withdrawals don't restock
+- repeated cycles = demand intensity
+
+Two confounders are controlled: store-wide flips (>25% of a store's SKUs
+flipping in one snapshot = feed artefact, discounted) and disappearance from
+the feed (delisted ≠ sold, excluded).
+
+## Ranking
+
+The prototype `margin × velocity ÷ log(competitors)` formula is gone — it
+mixed incommensurable quantities and couldn't be sanity-checked against
+money. The score is now directly interpretable:
+
+```
+E[monthly contribution] = E[monthly orders] × E[contribution/order]
+score = E[monthly contribution] × MatchConf × SupplyConf − CapitalCost
+```
+
+Competitor count feeds the demand estimate (share-of-market shrinks with
+crowding) instead of being an arbitrary divisor. `expected_monthly_orders` is
+a structured estimator with visible assumptions, not a fitted model — fitting
+one requires sales outcomes that don't exist until the thing has been traded.
+
+## The funnel (`scan.py funnel`)
+
+The experiment that matters: how much of the observed universe survives real
+economics. Prints the distribution, not the top ten — a top-ten list looks
+good from any distribution.
 
 ```bash
-export EBAY_CLIENT_ID=...  EBAY_CLIENT_SECRET=...   # free keyset
-python3 scan.py score --min-margin 0.25 --duty 0.12
-python3 scan.py score --synthetic                   # no keyset: stub comps
+export EBAY_CLIENT_ID=... EBAY_CLIENT_SECRET=...    # free keyset
+python3 scan.py funnel -n 300
+python3 scan.py funnel -n 300 --synthetic           # no keyset: machinery test
 ```
+
+Stages are labelled REAL / SYNTH so a stub run can't masquerade as market
+evidence. Reports: survival by stage, contribution percentiles (median / P75
+/ P90), survivor counts at £5/£10/£15, survivor rate by category, store
+concentration (a shortlist 90% inside one store is one bet, not a
+portfolio), and depletion-confidence vs competitor count once enough
+snapshots exist.
 
 Comps are cached for 6 h and looked up **once per product, not per variant** —
 eight sizes of one shoe are one trade and one call. That keeps a scan inside
 the free 5,000 calls/day quota.
-
-Without credentials `score` runs `--synthetic`: deterministic stub comps so the
-fee model and ranking are still exercisable. Those rows are labelled and must
-not be traded on.
 
 ## Next
 

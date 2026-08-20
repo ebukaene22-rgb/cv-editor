@@ -30,7 +30,6 @@ import base64
 import gzip
 import hashlib
 import json
-import math
 import os
 import sqlite3
 import statistics
@@ -55,40 +54,6 @@ CREATE TABLE IF NOT EXISTS comps (
 );
 """
 
-
-# ------------------------------------------------------------------ fee model
-
-class Fees:
-    """
-    Landed-cost and net-proceeds model. Defaults are deliberately pessimistic:
-    a gap that only clears an optimistic fee model is not a trade.
-    """
-    def __init__(self, marketplace_pct=0.132, payment_pct=0.029, payment_flat=0.30,
-                 ship_per_kg=9.0, ship_base=4.0, duty_pct=0.0, return_rate=0.06):
-        self.marketplace_pct = marketplace_pct   # eBay final value fee, typical
-        self.payment_pct = payment_pct
-        self.payment_flat = payment_flat
-        self.ship_per_kg = ship_per_kg
-        self.ship_base = ship_base
-        self.duty_pct = duty_pct                 # set per lane; 0 is optimistic
-        self.return_rate = return_rate
-
-    def landed_cost(self, buy_price, grams):
-        kg = (grams or 500) / 1000.0
-        ship = self.ship_base + self.ship_per_kg * kg
-        return buy_price * (1 + self.duty_pct) + ship
-
-    def net_proceeds(self, sell_price):
-        fees = (sell_price * (self.marketplace_pct + self.payment_pct)
-                + self.payment_flat)
-        return (sell_price - fees) * (1 - self.return_rate)
-
-    def margin(self, buy_price, sell_price, grams):
-        cost = self.landed_cost(buy_price, grams)
-        if cost <= 0:
-            return None, None, None
-        net = self.net_proceeds(sell_price)
-        return (net - cost) / cost, cost, net
 
 
 # ------------------------------------------------------------------ comp client
@@ -193,32 +158,3 @@ class EbayComp:
                 "n": 1 + h % 400, "currency": "USD", "synthetic": True}
 
 
-# ------------------------------------------------------------------ scoring
-
-def sell_through(conn, domain, sku, snapshots=None):
-    """
-    Fraction of observed intervals in which this variant went 1 -> 0.
-    Measured on our own history, which is the only velocity data we have.
-    """
-    rows = conn.execute(
-        "SELECT ts,available FROM obs WHERE domain=? AND sku=? ORDER BY ts",
-        (domain, sku)).fetchall()
-    if len(rows) < 2:
-        return None
-    flips = sum(1 for a, b in zip(rows, rows[1:]) if a[1] == 1 and b[1] == 0)
-    return flips / (len(rows) - 1)
-
-
-def score_row(margin, st, competitors):
-    """
-    margin x velocity / crowding.
-
-    Velocity is unknown until a second snapshot exists; treat unknown as a
-    neutral 0.5 rather than 0, or every candidate scores zero on day one.
-    Competition is damped with a log: the 40th seller hurts far less than
-    the 4th.
-    """
-    if margin is None or margin <= 0:
-        return 0.0
-    v = 0.5 if st is None else min(1.0, 0.15 + st * 4)
-    return margin * v / math.log(2.718 + (competitors or 0))
