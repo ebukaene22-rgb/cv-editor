@@ -1,3 +1,9 @@
+> **This repo currently hosts two unrelated projects**, both scaffolded here for
+> the same session-access reason. The football pipeline is below;
+> [`ecommerce_os/`](ecommerce_os/README.md) is a compliant-ecommerce decision
+> engine with its own [strategy doc](docs/ecommerce-os/strategy.md). Both are
+> intended to migrate to dedicated repos.
+
 # Instinct / IQ — Football Scout Channel
 
 A reproducible production pipeline for a faceless YouTube Shorts / TikTok channel that
