@@ -1,0 +1,50 @@
+# Daily supply-side snapshot for the arbitrage scanner.
+#
+# The depletion time-series is calendar-gated: replenishment cycles only
+# become visible from consecutive daily observations, so missed days are
+# unrecoverable. This job appends one snapshot per day to the committed
+# prices.db on the arbitrage branch.
+#
+# NOTE: the `schedule` trigger only fires from the repo's DEFAULT branch.
+# Until this file exists there, use "Run workflow" (workflow_dispatch) on
+# the arbitrage branch to take a snapshot manually.
+
+name: arbitrage-snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * *"   # daily 05:17 UTC (09:17 Dubai)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arbitrage-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/dropshipping-arbitrage-scraping-bfnfv3
+
+      - name: Take snapshot and export
+        working-directory: arbitrage
+        run: |
+          python3 scan.py snapshot
+          python3 scan.py export
+
+      - name: Commit price history
+        run: |
+          git config user.name "arbitrage-snapshot-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add arbitrage/history
+          if git diff --cached --quiet; then
+            echo "no changes"; exit 0
+          fi
+          git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push origin claude/dropshipping-arbitrage-scraping-bfnfv3

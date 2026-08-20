@@ -394,6 +394,57 @@ def cmd_labels(args):
     RV.report(db())
 
 
+
+def cmd_export(args):
+    """Export snapshots to history/*.csv.gz -- the git-friendly archive."""
+    import csv, gzip
+    conn = db()
+    os.makedirs("history", exist_ok=True)
+    cols = ["ts","domain","grp","region","sku","title","vendor","price",
+            "compare","currency","available","grams"]
+    n = 0
+    for (ts,) in conn.execute("SELECT DISTINCT ts FROM obs ORDER BY ts"):
+        path = os.path.join("history", ts.replace(":", "") + ".csv.gz")
+        if os.path.exists(path):
+            continue
+        with gzip.open(path, "wt", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(cols)
+            w.writerows(conn.execute(
+                f"SELECT {','.join(cols)} FROM obs WHERE ts=?", (ts,)))
+        n += 1
+        print(f"  wrote {path}")
+    print(f"exported {n} snapshot(s)")
+
+
+def cmd_rebuild(args):
+    """Rebuild prices.db from history/*.csv.gz."""
+    import csv, gzip, glob as g
+    conn = db()
+    have = {t for (t,) in conn.execute("SELECT DISTINCT ts FROM obs")}
+    n = rows = 0
+    for path in sorted(g.glob("history/*.csv.gz")):
+        with gzip.open(path, "rt", newline="") as f:
+            rd = csv.DictReader(f)
+            batch = [(r["ts"], r["domain"], r["grp"] or None,
+                      r["region"] or None, r["sku"], r["title"], r["vendor"],
+                      float(r["price"]) if r["price"] else None,
+                      float(r["compare"]) if r["compare"] else None,
+                      r["currency"], int(r["available"]),
+                      int(r["grams"]) if r["grams"] else None)
+                     for r in rd]
+        if batch and batch[0][0] in have:
+            continue
+        conn.executemany(
+            "INSERT INTO obs (ts,domain,grp,region,sku,title,vendor,price,"
+            "compare,currency,available,grams) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            batch)
+        n += 1
+        rows += len(batch)
+    conn.commit()
+    print(f"loaded {n} snapshot(s), {rows:,} rows")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -435,6 +486,10 @@ def main():
     g.set_defaults(fn=cmd_ingest)
     lb = sub.add_parser("labels")
     lb.set_defaults(fn=cmd_labels)
+    ex = sub.add_parser("export")
+    ex.set_defaults(fn=cmd_export)
+    rb = sub.add_parser("rebuild")
+    rb.set_defaults(fn=cmd_rebuild)
     a = ap.parse_args()
     a.fn(a)
 

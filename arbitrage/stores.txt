@@ -14,3 +14,18 @@ shopify   drinkolipop.com               USD  US
 shopify   www.redbullshopus.com         USD  US
 
 woo       www.tinywoodstove.com         USD  US
+
+# widened 2026-08-20: reduce single-retailer concentration
+shopify   gymshark.com                  USD  US  gymshark
+shopify   www.taylorstitch.com          USD  US
+shopify   www.brooklinen.com            USD  US
+shopify   www.tentree.com               USD  US
+shopify   www.vessi.com                 USD  US
+shopify   www.colourpop.com             USD  US
+shopify   jeffreestarcosmetics.com      USD  US
+shopify   www.culturekings.com          USD  US
+shopify   www.ridgewallet.com           USD  US
+shopify   www.rhoback.com               USD  US
+shopify   www.stanley1913.com           USD  US  stanley
+shopify   uk.stanley1913.com            GBP  GB  stanley
+shopify   www.aloyoga.com               USD  US
