@@ -2,6 +2,7 @@
 """Micro-SaaS acquisition pipeline — command line entry point.
 
     python acquisition/run.py gate                    # Phase 1 + 2 acceptance tests
+    python acquisition/run.py preflight               # which sources can this network reach?
     python acquisition/run.py real --mirror           # D3 against the real directory
     python acquisition/run.py neglect                 # D3 WordPress.org off-market pull
     python acquisition/run.py marketplace             # D2 Flippa + TrustMRR pull
@@ -34,7 +35,8 @@ from acq.rules import RuleEngine                                 # noqa: E402
 from acq.store import candidate_store, neglect_store             # noqa: E402
 from acq.sources.base import SourceError                         # noqa: E402
 from acq.sources.fixture import FixtureSession                   # noqa: E402
-from acq.sources.wp_mirror import WordPressMirrorSource          # noqa: E402
+from acq.sources.wp_mirror import (CURRENT_URL, RATINGS_URL,      # noqa: E402
+                                   WordPressMirrorSource)
 from acq.sources.flippa import (ApifyActorBackend,               # noqa: E402
                                 FlippaSource, JsonEndpointBackend)
 from acq.sources.trustmrr import TrustMrrSource, cross_check     # noqa: E402
@@ -214,6 +216,61 @@ def cmd_weekly(args) -> int:
               f"return data. The sheet reflects stored data only; do not read a short "
               f"shortlist as a quiet week.")
         return 1
+    return 0
+
+
+SOURCE_HOSTS = [
+    ("D3  WordPress.org API", "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins"
+                              "&request[per_page]=1", "official, documented, no auth"),
+    ("D3  WordPress.org site", "https://wordpress.org/plugins/", "plugin pages, fallback"),
+    ("D3  mirror: current", CURRENT_URL, "GitHub mirror, ~6-hourly"),
+    ("D3  mirror: ratings", RATINGS_URL, "GitHub mirror, 2024 snapshot"),
+    ("D2  Flippa", "https://flippa.com/v3/listings", "undocumented JSON endpoint"),
+    ("D2  TrustMRR", "https://trustmrr.com/", "via Apify actor"),
+    ("D2  Apify", "https://api.apify.com/v2/", "actor host for Flippa + TrustMRR"),
+    ("--  ECB reference rates", "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+     "FX normalisation"),
+]
+
+
+def cmd_preflight(args) -> int:
+    """Report which sources this network can actually reach.
+
+    Worth its own command because the alternative is discovering it halfway
+    through a run, or — worse — reading it in a stale note in a README. A source
+    that cannot be reached produces no candidates, and no candidates looks
+    exactly like a quiet week.
+    """
+    import requests
+
+    print(f"{'source':<26} {'status':<10} note")
+    print("-" * 78)
+    reachable = 0
+    for label, url, note in SOURCE_HOSTS:
+        try:
+            resp = requests.get(url, timeout=20,
+                                headers={"User-Agent": load_config(args)["run.user_agent"]})
+            status, detail = "OK", f"HTTP {resp.status_code}"
+            reachable += 1
+        except requests.exceptions.ProxyError:
+            status, detail = "BLOCKED", "egress proxy refused CONNECT (policy denial)"
+        except requests.exceptions.SSLError as exc:
+            status, detail = "TLS", str(exc)[:44]
+        except requests.exceptions.ConnectionError:
+            status, detail = "NO ROUTE", "connection failed"
+        except requests.exceptions.Timeout:
+            status, detail = "TIMEOUT", "no response in 20s"
+        except Exception as exc:
+            status, detail = "ERROR", f"{type(exc).__name__}"
+        print(f"{label:<26} {status:<10} {detail} — {note}")
+
+    print(f"\n{reachable} of {len(SOURCE_HOSTS)} reachable.")
+    if reachable < len(SOURCE_HOSTS):
+        print("A BLOCKED source is an environment network policy, not a bug in this code "
+              "and not\nsomething to retry. Allow the domain in the environment's network "
+              "policy to change it:\nhttps://code.claude.com/docs/en/claude-code-on-the-web")
+        print("Until then, that stream produces no candidates. Do not substitute anything "
+              "for them.")
     return 0
 
 
@@ -405,6 +462,8 @@ def build_parser() -> argparse.ArgumentParser:
     m.set_defaults(fn=cmd_marketplace)
 
     add("screen", "re-run the rule engine over the store").set_defaults(fn=cmd_screen)
+
+    add("preflight", "report which sources this network can reach").set_defaults(fn=cmd_preflight)
 
     rl = add("real", "D3 against the real WordPress.org directory — real plugins only")
     rl.add_argument("--mirror", action="store_true",

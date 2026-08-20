@@ -345,25 +345,46 @@ it just quietly returns nothing, or everything.
 - **Currency.** Listings are mostly USD; the buyer thinks in GBP and operates in
   AED. Normalised once, at ingestion, at ECB daily reference rates.
 
-### Egress note
+### Egress note — check it yourself
 
-The environment this was built in blocks `api.wordpress.org`, `wordpress.org`,
-`flippa.com` and `public-api.wordpress.com` at the egress proxy. Consequences,
-stated exactly:
+```bash
+python acquisition/run.py preflight
+```
 
-- **D3 has been run on real data** via `real --mirror`, which reads public
-  GitHub mirrors of the same directory. 66,012 real plugins, 44,085 with
-  complete data, 1,352 inside the neglect band. This is what found the two
+Reports which sources this network can actually reach, so reachability is a
+command rather than a claim in a README that goes stale. In the environment this
+was built in:
+
+| Source | Status |
+|---|---|
+| `api.wordpress.org`, `wordpress.org` | **blocked** — 403 on CONNECT |
+| GitHub mirrors of the directory | reachable |
+| `flippa.com`, `api.flippa.com` | **blocked** — 403 on CONNECT |
+| `trustmrr.com`, `api.apify.com` | **blocked** — 403 on CONNECT |
+| `ecb.europa.eu` (FX) | **blocked** — 403 on CONNECT |
+
+A BLOCKED row is the environment's network policy, not a bug and not something
+to retry. Allow the domain in the environment's network policy to change it:
+<https://code.claude.com/docs/en/claude-code-on-the-web>
+
+What that means for each deliverable, stated exactly:
+
+- **D3 has run on real data** via `real --mirror` — 66,012 real plugins, 44,085
+  with complete data, 1,352 in the neglect band. This is what found the two
   scoring defects above.
-- **D3 against the official API is still unexercised.** The mirror reshapes
-  records into the API's response format and pushes them through the same
-  mapper, so the parsing and scoring code is genuinely tested — but the HTTP
-  paging path in `WordPressSource.fetch_neglect` has only ever run against
-  fixtures. One live `neglect --pages 2` closes that.
-- **D2 has never run on real data.** Both marketplaces are blocked and no
+- **D3 against the official API is unexercised.** The mirror reshapes records
+  into the API's response format and pushes them through the same mapper, so
+  parsing and scoring are genuinely tested — but the HTTP paging path in
+  `WordPressSource.fetch_neglect` has only ever run against fixtures. One live
+  `neglect --pages 2` closes that.
+- **D2 has never run on real data.** Every marketplace host is blocked and no
   reachable mirror of their listings exists. The Flippa and TrustMRR parsers are
-  tested against fixtures only. Those fixtures are field-mapping tests, not
-  candidates, and nothing from them may be quoted as a screening result.
+  fixture-tested only; those fixtures are field-mapping tests, not candidates,
+  and nothing from them may be quoted as a screening result.
+- **FX is on the fallback table** while `ecb.europa.eu` is blocked, and says so
+  loudly on every run. Pass `--fx-rate` for a reproducible figure. Ratios are
+  unaffected, but the budget band and the ARPU floor are absolute, so a wrong
+  rate silently changes which deals pass.
 
 ---
 
