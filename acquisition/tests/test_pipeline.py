@@ -142,6 +142,42 @@ def test_screening(cfg: Config) -> list[Candidate]:
     return candidates
 
 
+def test_prose_changes_disposition(cfg: Config) -> None:
+    """A customer count that exists only in the summary can flip a listing.
+
+    The endpoint returns no customer count, so ARPU is uncomputable from it
+    alone and the listing looks clean. Read the count out of the prose and the
+    same listing rejects on the ARPU floor. This is the whole reason the
+    extractor exists, so it gets its own case.
+    """
+    raw = {
+        "id": 99001, "title": "Niche CRM", "industry": "saas",
+        "business_model": "subscription", "current_price": 9000,
+        "average_revenue": 9600, "average_profit": 7200,
+        "revenue_per_month": 800, "profit_per_month": 600,
+        "established_at": "2021-02-01", "currency": "USD",
+        "summary": "Low-cost CRM. 62 paying stores on monthly plans.",
+    }
+    engine = RuleEngine(cfg, classifier=HeuristicClassifier())
+
+    blind = normalise(FlippaSource.to_listing(raw, read_prose=False), FX)
+    engine.screen(blind)
+    expect(blind.arpu is None and blind.disposition == "review",
+           "without prose the listing has no ARPU and passes screening",
+           f"arpu={blind.arpu} disposition={blind.disposition}")
+
+    seeing = normalise(FlippaSource.to_listing(raw, read_prose=True), FX)
+    engine.screen(seeing)
+    expect(seeing.active_customers == 62,
+           "the customer count is read out of the summary", str(seeing.active_customers))
+    expect(seeing.arpu is not None and seeing.arpu < cfg["targets.min_arpu_gbp"],
+           "ARPU is now computable and sits below the floor",
+           f"£{seeing.arpu:.2f}" if seeing.arpu else "None")
+    expect("ARPU_BELOW_FLOOR" in seeing.reject_reasons(),
+           "prose-derived ARPU flips the disposition to reject",
+           str(seeing.reject_reasons()))
+
+
 # ------------------------------------------------------------------ outputs
 def test_outputs(cfg: Config, tmp: Path) -> None:
     candidates = test_screening(cfg)
@@ -238,6 +274,7 @@ def main() -> int:
     print("=" * 72)
     try:
         test_ingestion(cfg)
+        test_prose_changes_disposition(cfg)
         test_dedupe(cfg, tmp)
         test_cross_check(cfg)
         test_outputs(cfg, tmp)

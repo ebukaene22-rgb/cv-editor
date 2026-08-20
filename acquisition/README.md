@@ -27,7 +27,10 @@ python .claude/skills/deal-screen/scripts/check_config.py
 # 2. Does the rule engine still catch known-bad listings?
 python acquisition/run.py gate
 
-# 3. Run the week
+# 3. Rehearse a full run offline — no network, deterministic, disposable
+python acquisition/run.py demo --fresh
+
+# 4. Run the week for real
 python acquisition/run.py weekly --sender "Your Name"
 ```
 
@@ -65,6 +68,7 @@ commands.
 python acquisition/run.py gate                     # acceptance tests (run this first)
 python acquisition/run.py neglect                  # D3 — WordPress.org off-market pull
 python acquisition/run.py marketplace              # D2 — Flippa pull + TrustMRR cross-check
+python acquisition/run.py demo                     # rehearse a full run, offline
 python acquisition/run.py screen                   # re-run the engine over the store
 python acquisition/run.py weekly                   # everything, then write D6/D7/D8
 python acquisition/run.py show <id>                # one candidate, in full
@@ -84,6 +88,69 @@ Global flags work before or after the subcommand:
 | `--apify-actor ID` | Read Flippa through an Apify actor rather than the JSON endpoint. |
 | `--trustmrr-actor ID` | Enable the TrustMRR cross-check. |
 | `--sender "Name"` | Sign outreach drafts. |
+
+---
+
+## Test runs
+
+Three levels, cheapest first.
+
+### 1. The gates — is the logic right?
+
+```bash
+python acquisition/run.py gate
+```
+
+Four suites, all offline and deterministic. They pin USD→GBP so a run never
+depends on what the ECB published today, and they use the heuristic
+channel-risk classifier so it never depends on model sampling.
+
+| Suite | Proves |
+|---|---|
+| `test_rules.py` | **The Phase 1 gate.** All five Appendix A listings rejected or flagged correctly. |
+| `test_extract.py` | Figures read out of listing prose — and, mostly, what must *not* be read. |
+| `test_wordpress.py` | Wire-format parsing, the neglect band, the score formula, ≥200 candidates at volume. |
+| `test_pipeline.py` | Ingestion → cross-check → store → D6/D7/D8, including tracker round-trips. |
+
+### 2. The demo — what does a run actually produce?
+
+```bash
+python acquisition/run.py demo --fresh
+```
+
+The same code path as `weekly` — same ingestion, same rule engine, same
+writers — with every source replayed from fixtures and every path redirected to
+`out/demo/` and `data/demo/`. Nothing live is contacted and real candidate data
+cannot be touched.
+
+The corpus is deliberately wrong in the ways the real thing is wrong: sponsored
+listings outside the price band, a listing whose stated profit exceeds its
+revenue, an "ARR" figure the trailing revenue doesn't support, plugins whose
+rating arrives on the wrong scale. A rehearsal against clean data teaches
+nothing.
+
+Marketplace listings and TrustMRR records are committed JSON at
+`tests/fixtures/demo_*.json` — edit them to try a case of your own. The
+WordPress corpus is generated deterministically at run time (`--plugins N`),
+because 4,000 plugin records is not a file anyone should have to read.
+
+The run also prints a **rule coverage** table: which flag rules had the inputs to
+run at all. A rule that never fires because the source doesn't carry its inputs
+is indistinguishable, in a results table, from a rule that ran and found
+nothing — and the two mean opposite things.
+
+### 3. Live — does the real wire format still match?
+
+```bash
+python acquisition/run.py neglect --pages 2          # smallest real WordPress.org pull
+python acquisition/run.py marketplace --limit 20     # smallest real Flippa pull
+python acquisition/run.py weekly --sender "Your Name"
+```
+
+Start with `neglect --pages 2`: it is the sanctioned, unauthenticated source, so
+it is the one most likely to work and the fastest way to confirm the wire format
+hasn't drifted. `--fixture path.json` replays a saved response if you want to
+re-run against yesterday's data.
 
 ---
 
@@ -149,7 +216,7 @@ human decides.
 
 ---
 
-## Three additions beyond the brief
+## Four additions beyond the brief
 
 Flagged here rather than buried, because they change what the engine does:
 
@@ -164,6 +231,15 @@ Flagged here rather than buried, because they change what the engine does:
    user count in the headline and a payer count in the metrics box are the
    common inflation pattern. ARPU is computed against payers where disclosed,
    which is what makes an impossible ARPU surface rather than average away.
+4. **Prose extraction** (`src/acq/extract.py`) — found by running the demo.
+   Flippa's confirmed field list has no customer count, no churn and no stated
+   LTV, so on live data `LTV_IMPLAUSIBLE` and `CUSTOMER_COUNT_INFLATED` could
+   never fire; the coverage table showed them evaluable on 0 of 13 candidates.
+   Those figures are in the `summary` field, in prose. The extractor reads them
+   deterministically and conservatively — ambiguity returns nothing, an
+   endpoint figure always beats a prose figure, and every extracted value
+   records the phrase it came from. It moved `CUSTOMER_COUNT_INFLATED` to 7 of
+   13 and turned four listings that looked clean into correct ARPU rejects.
 
 Appendix A case 2 is listed in the brief as a flag case; the engine additionally
 hard-rejects it on the multiple (7.6× against TTM) and on ARPU. Both are correct,

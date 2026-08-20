@@ -1,0 +1,140 @@
+[
+  {
+    "data": [
+      {
+        "id": 11500001, "title": "Shopify inventory alerts app", "property_type": "saas",
+        "status": "open", "current_price": 11500, "buy_it_now_price": 11500,
+        "average_revenue": 9600, "average_profit": 7200, "revenue_per_month": 800,
+        "profit_per_month": 600, "business_model": "subscription", "industry": "saas",
+        "uniques_per_month": 4200, "has_verified_revenue": false, "established_at": "2021-02-01",
+        "currency": "USD", "listing_url": "https://flippa.com/11500001", "multiple": 1.2,
+        "summary": "Low-stock alerts for Shopify merchants. 24 paying stores. Customers find us through the Shopify app store listing and organic search for 'shopify inventory alerts'. Runs itself; I spend about an hour a month on support."
+      },
+      {
+        "id": 11500002, "title": "Agency time tracker", "property_type": "saas",
+        "status": "open", "current_price": 9500, "average_revenue": 7800,
+        "average_profit": 6000, "revenue_per_month": 650, "profit_per_month": 500,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 2100,
+        "has_verified_revenue": false, "established_at": "2020-09-15", "currency": "USD",
+        "listing_url": "https://flippa.com/11500002", "multiple": 1.2,
+        "summary": "Timesheets for small agencies. 21 agencies on annual plans. Growth is entirely from a Google ranking for 'agency timesheet software'."
+      },
+      {
+        "id": 11500003, "title": "WooCommerce shipping rules SaaS", "property_type": "saas",
+        "status": "open", "current_price": 18000, "average_revenue": 14400,
+        "average_profit": 11500, "revenue_per_month": 1200, "profit_per_month": 958,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 6800,
+        "has_verified_revenue": true, "established_at": "2019-06-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500003", "multiple": 1.25,
+        "summary": "Conditional shipping rules for WooCommerce stores. Listed in the WooCommerce marketplace and ranks for several long-tail shipping queries. Stripe verified."
+      },
+      {
+        "id": 11500004, "title": "SEO rank tracker for agencies", "property_type": "saas",
+        "status": "open", "current_price": 16000, "average_revenue": 13200,
+        "revenue_per_month": 1100, "business_model": "subscription", "industry": "saas",
+        "uniques_per_month": 5100, "has_verified_revenue": false,
+        "established_at": "2021-11-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500004",
+        "summary": "White-label rank tracking. 44 agency accounts. Costs are low, around $90/mo for the SERP API. Acquisition is organic and a small affiliate programme."
+      },
+      {
+        "id": 11500005, "title": "Invoice reminder tool", "property_type": "saas",
+        "status": "open", "current_price": 7000, "average_revenue": 9000,
+        "average_profit": 6600, "revenue_per_month": 520, "profit_per_month": 380,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 1900,
+        "has_verified_revenue": false, "established_at": "2020-01-20", "currency": "USD",
+        "listing_url": "https://flippa.com/11500005",
+        "summary": "Automated invoice chasing for freelancers. Revenue peaked last year and has come down since; I stopped doing any marketing in the spring."
+      },
+      {
+        "id": 11500006, "title": "AI thumbnail generator", "property_type": "saas",
+        "status": "open", "current_price": 14000, "average_revenue": 2100,
+        "revenue_per_month": 175, "business_model": "subscription", "industry": "ai-wrapper",
+        "uniques_per_month": 30000, "has_verified_revenue": false,
+        "established_at": "2025-03-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500006",
+        "summary": "Blew up after my Twitter thread went viral. 30k monthly visitors and growing fast."
+      },
+      {
+        "id": 11500007, "title": "SPONSORED — Enterprise logistics platform",
+        "property_type": "saas", "status": "open", "current_price": 480000,
+        "average_revenue": 240000, "revenue_per_month": 20000,
+        "business_model": "subscription", "industry": "saas", "has_verified_revenue": true,
+        "established_at": "2016-01-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500007",
+        "summary": "Injected outside the requested filter range. Must be re-filtered client-side."
+      },
+      {
+        "id": 11500008, "title": "Home fitness affiliate review site",
+        "property_type": "website", "status": "open", "current_price": 4997,
+        "average_revenue": 160, "average_profit": 28, "business_model": "affiliate",
+        "industry": "affiliate", "uniques_per_month": 900, "has_verified_revenue": false,
+        "established_at": "2022-01-01", "currency": "USD", "multiple": 2.0,
+        "listing_url": "https://flippa.com/11500008",
+        "summary": "Turnkey affiliate site in the home fitness niche. Priced at 2x revenue, a steal at this price. Traffic is organic and the content is evergreen."
+      },
+      {
+        "id": 11500009, "title": "AI video generation app", "property_type": "saas",
+        "status": "open", "current_price": 9000, "average_revenue": 1178,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 19800,
+        "has_verified_revenue": false, "established_at": "2024-05-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500009",
+        "summary": "AI video app doing $5,753 ARR and growing. 19.8k monthly users. Running costs are minimal, under $40/mo in API spend."
+      },
+      {
+        "id": 11500010, "title": "YouTube channel growth tool", "property_type": "saas",
+        "status": "open", "current_price": 9000, "average_revenue": 7000,
+        "revenue_per_month": 470, "business_model": "subscription", "industry": "saas",
+        "uniques_per_month": 8200, "has_verified_revenue": false,
+        "established_at": "2023-01-15", "currency": "USD",
+        "listing_url": "https://flippa.com/11500010",
+        "summary": "SaaS for YouTube creators. LTV is $7,200 per customer. Most of the early users came from my audience — I have a channel in this niche and promoted it there at launch."
+      },
+      {
+        "id": 11500011, "title": "macOS text-to-speech app", "property_type": "saas",
+        "status": "open", "current_price": 72000, "average_revenue": 24588,
+        "business_model": "pay-once", "industry": "desktop-app",
+        "has_verified_revenue": true, "established_at": "2022-10-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500011",
+        "summary": "One-time purchase Mac app, $29 lifetime licence. Nearly all sales came from my own channels and a Product Hunt launch that hit number one."
+      },
+      {
+        "id": 11500012, "title": "LinkedIn prospecting extension", "property_type": "saas",
+        "status": "open", "current_price": 12000, "average_revenue": 8400,
+        "average_profit": 7000, "revenue_per_month": 700, "profit_per_month": 583,
+        "business_model": "subscription", "industry": "chrome-extension",
+        "uniques_per_month": 3300, "has_verified_revenue": false,
+        "established_at": "2022-04-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500012",
+        "summary": "Chrome extension that scrapes LinkedIn profiles into a CRM. 90 paying users."
+      },
+      {
+        "id": 11500013, "title": "Newsletter analytics dashboard", "property_type": "saas",
+        "status": "open", "current_price": 21000, "average_revenue": 6200,
+        "average_profit": 3100, "revenue_per_month": 516, "profit_per_month": 258,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 2400,
+        "has_verified_revenue": false, "established_at": "2021-08-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500013",
+        "summary": "Open and click analytics for newsletter operators. Steady but slow."
+      },
+      {
+        "id": 11500014, "title": "Restaurant booking widget", "property_type": "saas",
+        "status": "open", "current_price": 8500, "average_revenue": 5400,
+        "average_profit": 4300, "revenue_per_month": 450, "profit_per_month": 358,
+        "business_model": "subscription", "industry": "saas", "uniques_per_month": 1500,
+        "has_verified_revenue": false, "established_at": "2025-06-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500014",
+        "summary": "Embeddable booking widget for independent restaurants. 30 venues signed up since launch."
+      },
+      {
+        "id": 11500015, "title": "AI video creator", "property_type": "saas",
+        "status": "open", "current_price": 15000, "average_revenue": 6900,
+        "profit_per_month": 600, "business_model": "subscription", "industry": "saas",
+        "uniques_per_month": 11000, "has_verified_revenue": false,
+        "established_at": "2024-01-01", "currency": "USD",
+        "listing_url": "https://flippa.com/11500015",
+        "summary": "1,000 customers on plans from $5/mo. Clearing $600/mo profit, so it pays for itself in about 2 years."
+      }
+    ]
+  }
+]

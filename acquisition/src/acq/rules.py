@@ -276,6 +276,33 @@ class RuleEngine:
             self._flag(c, LOSS_MAKING, f"annual profit £{c.annual_profit:,.0f}",
                        "costs exceed revenue on the seller's own figures")
 
+    # -------------------------------------------------------------- coverage
+    #  Which flag rules had the inputs to run at all. A rule that never fires
+    #  because the source does not carry its inputs is indistinguishable, in a
+    #  results table, from a rule that fires and finds nothing — and the two
+    #  mean opposite things.
+    RULE_INPUTS = {
+        DECLINING: ("trend_ratio",),
+        TREND_MISMATCH: ("trend_ratio",),
+        LTV_IMPLAUSIBLE: ("stated_ltv", "monthly_churn"),
+        CUSTOMER_COUNT_INFLATED: ("mrr", "active_customers"),
+        SELF_CONTRADICTORY: ("price_to_revenue",),
+        COSTS_AMBIGUOUS: ("annual_revenue",),
+        UNVERIFIED: (),
+        CHANNEL_RISK: ("listing_text",),
+    }
+
+    @classmethod
+    def coverage(cls, candidates: list[Candidate]) -> dict[str, tuple[int, int]]:
+        """Return {rule: (evaluable, total)} across a set of candidates."""
+        total = len(candidates)
+        out = {}
+        for rule, fields in cls.RULE_INPUTS.items():
+            evaluable = sum(1 for c in candidates
+                            if all(getattr(c, f, None) not in (None, "") for f in fields))
+            out[rule] = (evaluable, total)
+        return out
+
     # ----------------------------------------------------------------- score
     def fit(self, c: Candidate) -> float:
         """Positive signal only. Flags are subtracted afterwards, so a product

@@ -22,6 +22,7 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
+from ..extract import apply_to as extract_prose
 from ..models import Listing
 from .base import Source, SourceError
 
@@ -132,10 +133,14 @@ class FlippaSource(Source):
 
         kept = [l for l in listings if self._in_band(l)]
         dropped = len(listings) - len(kept)
+        print(f"{self.name}: {len(listings)} listings via {self.backend.name}")
         if dropped:
-            print(f"{self.name}: re-filtered {dropped} listing(s) outside the requested "
-                  f"price band (sponsored injections)")
-        print(f"{self.name}: {len(kept)} listings via {self.backend.name}")
+            # Sponsored slots are the usual cause, but the filter is unconditional:
+            # anything outside the band is out of the tier, however it got here.
+            print(f"{self.name}: dropped {dropped} outside the £"
+                  f"{self.cfg['budget.min_price_gbp']:,}–£{self.cfg['budget.max_price_gbp']:,} "
+                  f"band before screening (sponsored slots and mis-tiered listings)")
+        print(f"{self.name}: {len(kept)} in band")
         return kept[:limit] if limit else kept
 
     def _in_band(self, listing: Listing) -> bool:
@@ -147,7 +152,15 @@ class FlippaSource(Source):
         return self.min_price_native <= listing.asking_price <= self.max_price_native
 
     @classmethod
-    def to_listing(cls, raw: dict, currency: str = "USD") -> Listing | None:
+    def to_listing(cls, raw: dict, currency: str = "USD",
+                   read_prose: bool = True) -> Listing | None:
+        """Map one raw listing.
+
+        `read_prose` fills customer count, churn, stated LTV and entry price from
+        the `summary` text. The endpoint does not return any of them, and without
+        them LTV_IMPLAUSIBLE and CUSTOMER_COUNT_INFLATED can never fire on a live
+        pull. Endpoint values always win; prose only fills gaps.
+        """
         listing_id = raw.get("id")
         if listing_id is None:
             return None
@@ -167,7 +180,7 @@ class FlippaSource(Source):
         if ttm_revenue is not None and annual_profit is not None:
             ttm_costs = ttm_revenue - annual_profit
 
-        return Listing(
+        listing = Listing(
             source="flippa",
             source_id=str(listing_id),
             url=raw.get("listing_url") or f"https://flippa.com/{listing_id}",
@@ -187,6 +200,9 @@ class FlippaSource(Source):
             stated_multiple=get(raw.get("multiple")),
             raw={k: raw.get(k) for k in CAPTURE if k in raw},
         )
+        if read_prose:
+            extract_prose(listing)
+        return listing
 
     @staticmethod
     def _age_months(established_at) -> float | None:

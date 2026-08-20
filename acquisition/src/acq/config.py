@@ -42,6 +42,20 @@ class Config:
     def __getitem__(self, dotted: str) -> Any:
         return self.get(dotted)
 
+    def override(self, dotted: str, value: Any) -> "Config":
+        """Return a copy with one key replaced. Used by the demo run to point the
+        store and output paths somewhere disposable — a rehearsal must never be
+        able to write over real candidate data."""
+        import copy
+
+        data = copy.deepcopy(self._data)
+        node = data
+        parts = dotted.split(".")
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node[parts[-1]] = value
+        return Config(data, source=self.source)
+
     def base_dir(self) -> Path:
         """Directory that relative `paths.*` entries resolve against."""
         return self.source.parent if self.source else Path.cwd()

@@ -32,6 +32,8 @@ from acq.normalise import normalise                              # noqa: E402
 from acq.rules import RuleEngine                                 # noqa: E402
 from acq.store import candidate_store, neglect_store             # noqa: E402
 from acq.sources.base import SourceError                         # noqa: E402
+from acq.sources.demo import (DEMO_FLIPPA, DEMO_TRUSTMRR,         # noqa: E402
+                              wordpress_pages)
 from acq.sources.fixture import FixtureSession                   # noqa: E402
 from acq.sources.flippa import (ApifyActorBackend,               # noqa: E402
                                 FlippaSource, JsonEndpointBackend)
@@ -78,8 +80,8 @@ def _session(args):
 def cmd_gate(args) -> int:
     """Phase 1 is the acceptance gate for the whole system."""
     failed = 0
-    for script in ("tests/test_rules.py", "tests/test_wordpress.py",
-                   "tests/test_pipeline.py"):
+    for script in ("tests/test_rules.py", "tests/test_extract.py",
+                   "tests/test_wordpress.py", "tests/test_pipeline.py"):
         path = HERE / script
         if not path.exists():
             continue
@@ -215,6 +217,101 @@ def cmd_weekly(args) -> int:
     return 0
 
 
+def cmd_demo(args) -> int:
+    """Rehearse a complete weekly run against a deterministic offline corpus.
+
+    Same code path as `weekly` — same ingestion, same rule engine, same writers —
+    but every source is replayed from fixtures and every path is redirected to a
+    disposable directory. Use it to see what a run produces before trusting a
+    live one, and to check a config change against known data.
+    """
+    import json
+
+    base = load_config(args)
+    cfg = (base
+           .override("paths.store", "data/demo/candidates.json")
+           .override("paths.neglect_store", "data/demo/neglect.json")
+           .override("paths.out_dir", "out/demo"))
+    fx = FixedRates({"USD": 0.79, "GBP": 1.0})     # pinned: a rehearsal must repeat
+    engine = engine_for(cfg, args)
+    print(f"DEMO RUN — offline corpus, USD→GBP pinned at 0.79\n{'=' * 72}")
+
+    if args.fresh:
+        for path in (cfg.path("paths.store"), cfg.path("paths.neglect_store")):
+            path.unlink(missing_ok=True)
+
+    print("\n── marketplace (replayed) ──")
+    flippa = FlippaSource(cfg, session=FixtureSession.from_file(DEMO_FLIPPA), fx=fx)
+    flippa.delay = 0
+    candidates = [normalise(l, fx) for l in flippa.fetch()]
+
+    records = [TrustMrrSource.to_record(r) for r in json.loads(DEMO_TRUSTMRR.read_text())]
+    matched = cross_check(candidates, records, fx=fx)
+    print(f"trustmrr: cross-checked {len(candidates)} candidates against "
+          f"{len(records)} verified records, {matched} matched")
+
+    engine.screen_all(candidates)
+    store = candidate_store(cfg)
+    new = store.upsert(candidates)
+    store.save()
+
+    print("\n── off-market (generated) ──")
+    wp = WordPressSource(cfg, session=FixtureSession(wordpress_pages(args.plugins)))
+    wp.delay = 0
+    neglect = wp.fetch_neglect()
+    nstore = neglect_store(cfg)
+    nnew = nstore.upsert(neglect)
+    nstore.save()
+    print(f"stored {len(nstore)} neglect candidates ({len(nnew)} new since last run)")
+
+    review = [c for c in candidates if c.disposition == "review"]
+    rejected = [c for c in candidates if c.disposition == "reject"]
+    rate = len(rejected) / len(candidates) if candidates else 0
+
+    print(f"\n── screening ──")
+    print(f"{len(candidates)} screened · {len(review)} to review · {len(rejected)} rejected "
+          f"({rate:.0%}) · {len(new)} new since last run")
+    for c in sorted(rejected, key=lambda c: c.name):
+        print(f"  REJECT  {c.name[:42]:<42} {', '.join(c.reject_reasons())}")
+    for c in sorted(review, key=lambda c: c.score, reverse=True):
+        print(f"  REVIEW  {c.name[:42]:<42} score {c.score:>6.1f}  "
+              f"{', '.join(c.flag_names()) or 'no flags'}")
+
+    gaps = {rule: (n, t) for rule, (n, t) in RuleEngine.coverage(candidates).items() if n < t}
+    if gaps:
+        print("\n── rule coverage ──")
+        print("  These rules could not be evaluated on every candidate, because the "
+              "source\n  does not carry their inputs. Not-fired is not the same as "
+              "found-nothing:")
+        for rule, (n, t) in sorted(gaps.items(), key=lambda kv: kv[1][0]):
+            need = ", ".join(RuleEngine.RULE_INPUTS[rule])
+            print(f"  {rule:<26} evaluable on {n}/{t}   needs: {need}")
+
+    print("\n── top off-market ──")
+    for n in neglect[:5]:
+        print(f"  {n.neglect_score:6.2f}  {n.active_installs:>8,} installs  "
+              f"{n.months_since_update:>4.0f}mo  {n.rating}★  {n.name[:34]:<34} "
+              f"{n.author_profile}")
+
+    print("\n── outputs ──")
+    d = out_dir(cfg)
+    print(f"D6 candidate sheet  → {candidates_xlsx.write(review, d / 'candidates.xlsx', rejected=rejected)}")
+    print(f"D7 deal tracker     → {tracker_xlsx.write(review, d / 'deal-tracker.xlsx')}")
+    print(f"   outreach drafts  → {outreach.write(neglect[:args.outreach_count], sorted(review, key=lambda c: c.score, reverse=True)[:args.outreach_count], d / 'outreach-drafts.md', sender=args.sender)}")
+
+    top = max(review, key=lambda c: c.score, default=None)
+    if top is not None:
+        store.set_status(top.key, "contacted")
+        store.save()
+        top.status = "contacted"
+        print(f"D8 diligence pack   → {diligence.write(top, d / 'diligence')}")
+        print(f"   (promoted the top candidate to `contacted` to exercise D8)")
+
+    print(f"\nNothing was sent and no live endpoint was contacted. "
+          f"Delete {d.parent}/demo and data/demo to reset.")
+    return 0
+
+
 def cmd_promote(args) -> int:
     cfg = load_config(args)
     store = candidate_store(cfg)
@@ -321,6 +418,13 @@ def build_parser() -> argparse.ArgumentParser:
     m.set_defaults(fn=cmd_marketplace)
 
     add("screen", "re-run the rule engine over the store").set_defaults(fn=cmd_screen)
+
+    dm = add("demo", "rehearse a full run against an offline corpus (no network)")
+    dm.add_argument("--plugins", type=int, default=4000,
+                    help="size of the generated WordPress corpus (default 4000)")
+    dm.add_argument("--fresh", action="store_true",
+                    help="clear the demo store first, so everything reads as new")
+    dm.set_defaults(fn=cmd_demo)
 
     w = add("weekly", "full run: pull, screen, write D6/D7/D8")
     w.add_argument("--no-pull", action="store_true", help="use stored data only")
