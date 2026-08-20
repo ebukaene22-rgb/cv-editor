@@ -42,6 +42,31 @@ python .claude/skills/football-scout/scripts/validate.py episodes/2026-06-14-nic
 - **Licensed footage** (Wyscout / Getty) for hero shots where budget allows.
 - A `fair-use-lint` skill (planned) will flag footage ratio per episode.
 
+---
+
+# Second subsystem: Micro-SaaS Acquisition Pipeline
+
+The same repo also scaffolds a deal sourcing and screening system for buying small
+SaaS products — see [`acquisition/README.md`](acquisition/README.md). Same
+scaffolding caveat as above: intended to migrate to its own repo.
+
+```
+WordPress.org API ─┐
+Flippa / TrustMRR ─┴→ [normalise → GBP] → [rule engine] → ranked shortlist
+                                                 ↓
+                        candidates.xlsx · deal-tracker.xlsx · diligence packs
+                                                 ↓
+                          ⏸ HUMAN REVIEW → outreach drafts (never sent)
+```
+
+```bash
+python acquisition/run.py gate      # Appendix A acceptance gate — run this first
+python acquisition/run.py weekly    # the weekly run
+```
+
+- Skills: `deal-screen` (Stage 3 triage), `deal-verify` (Stage 5 reconciliation).
+- Commands: `/weekly-deals`, `/triage <id>`, `/verify-deal <id> <export.csv>`.
+
 ## Planned stack
 Script: Claude skill · Voice: ElevenLabs · Motion graphics: Remotion (data-driven from
 `script.json`) · Static brand templates: Canva MCP · Publish: drafts for human review.

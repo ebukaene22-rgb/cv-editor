@@ -9,3 +9,6 @@ episodes/*/vo_timestamps.json
 # acquisition pipeline — run artefacts and the candidate store stay local
 acquisition/data/
 acquisition/out/
+
+__pycache__/
+*.pyc
