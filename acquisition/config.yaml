@@ -48,6 +48,21 @@ neglect:                        # D3 — WordPress.org off-market band
   abandonment_divisor: 18       # months_since_last_update / this
   max_pages: 40                 # 100 per page; politeness ceiling per run
 
+  # Two guards on the brief's formula, both added after running it against the
+  # real directory. Set either to null to get the brief's raw behaviour back.
+  max_abandonment_multiple: 4.0 # cap the abandonment term at ~6 years. Uncapped it
+                                # is linear and unbounded, so a 15-year-old plugin
+                                # scores 10x on that term alone and swamps reach,
+                                # rating and disengagement combined. Past a few
+                                # years, more staleness is not more opportunity —
+                                # it is a product that no longer runs.
+  min_support_threads: 5        # below this many threads, use the neutral resolution
+                                # rate instead of the observed one. The API counts
+                                # threads over the last two months only, so 17,674
+                                # plugins have exactly one; "0 of 1 resolved" scored
+                                # maximum owner disengagement off a single data point
+                                # and captured the entire top of the list.
+
 run:
   currency: GBP
   fx_source: "ECB daily reference rates"

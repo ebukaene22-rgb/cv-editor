@@ -72,18 +72,27 @@ def months_since(when: datetime | None, now: datetime | None = None) -> float | 
 
 
 def neglect_score(active_installs: int, months_since_update: float, rating_5: float,
-                  support_resolution_rate: float, abandonment_divisor: float = 18.0) -> float:
-    """The brief's formula, guarded at every term.
+                  support_resolution_rate: float, abandonment_divisor: float = 18.0,
+                  max_abandonment: float | None = None) -> float:
+    """The brief's formula:
 
         log10(installs) * (months_since_update / 18) * (rating / 5) * (1 - resolution)
 
     Reach × abandonment × quality retained × owner disengagement. Ranked, never
     filtered on — a hard cutoff loses the good ones sitting just outside it.
+
+    `max_abandonment` caps the second term. Left at None the formula is exactly
+    as written in the brief; running it that way over the real directory puts
+    plugins last touched in 2010 at the top, because the term is linear and
+    unbounded and a 15-year-old plugin scores 10x on it. See the config for the
+    reasoning behind the default cap.
     """
     if active_installs <= 0:
         return 0.0
     reach = math.log10(max(active_installs, 10))
     abandonment = max(0.0, months_since_update) / abandonment_divisor
+    if max_abandonment is not None:
+        abandonment = min(abandonment, max_abandonment)
     quality = max(0.0, min(1.0, rating_5 / 5.0))
     disengagement = max(0.0, 1.0 - max(0.0, min(1.0, support_resolution_rate)))
     return round(reach * abandonment * quality * disengagement, 4)
@@ -122,6 +131,8 @@ class WordPressSource(Source):
         band_rating = self.cfg["neglect.min_rating"]
         max_pages = pages or self.cfg["neglect.max_pages"]
         divisor = self.cfg.get("neglect.abandonment_divisor", 18)
+        cap = self.cfg.get("neglect.max_abandonment_multiple", None)
+        min_threads = self.cfg.get("neglect.min_support_threads", 0) or 0
 
         found: list[NeglectCandidate] = []
         scanned = 0
@@ -135,7 +146,8 @@ class WordPressSource(Source):
             scanned += len(plugins)
 
             for raw in plugins:
-                candidate = self.to_candidate(raw, divisor)
+                candidate = self.to_candidate(raw, divisor, max_abandonment=cap,
+                                              min_support_threads=min_threads)
                 if candidate is None:
                     continue
                 if (candidate.active_installs >= band_installs
@@ -172,7 +184,9 @@ class WordPressSource(Source):
 
     @classmethod
     def to_candidate(cls, raw: dict, divisor: float = 18.0,
-                     now: datetime | None = None) -> NeglectCandidate | None:
+                     now: datetime | None = None,
+                     max_abandonment: float | None = None,
+                     min_support_threads: int = 0) -> NeglectCandidate | None:
         slug = raw.get("slug")
         if not slug:
             return None
@@ -190,7 +204,13 @@ class WordPressSource(Source):
 
         threads = int(raw.get("support_threads") or 0)
         resolved = int(raw.get("support_threads_resolved") or 0)
-        resolution = (resolved / threads) if threads else NO_THREADS_RESOLUTION
+        # The directory counts threads over the last two months only, so most
+        # plugins have none or one. One unanswered thread is not evidence that an
+        # owner has disengaged, and treating it as such hands a perfect score to
+        # 14,000 plugins. Below the sample floor, take the neutral rate.
+        resolution = (resolved / threads
+                      if threads >= max(1, min_support_threads)
+                      else NO_THREADS_RESOLUTION)
 
         today = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
         return NeglectCandidate(
@@ -207,7 +227,8 @@ class WordPressSource(Source):
             support_threads=threads,
             support_threads_resolved=resolved,
             support_resolution_rate=round(resolution, 3),
-            neglect_score=neglect_score(installs, stale_months, rating_5, resolution, divisor),
+            neglect_score=neglect_score(installs, stale_months, rating_5, resolution,
+                                        divisor, max_abandonment),
             first_seen=today,
             last_seen=today,
         )

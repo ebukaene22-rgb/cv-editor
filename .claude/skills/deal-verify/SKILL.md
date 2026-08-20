@@ -13,6 +13,17 @@ description: >
 
 Automate the parsing. Never automate the asking.
 
+## Rule zero — never invent a figure
+
+Every number you report must come from the export in front of you. Do not
+illustrate, do not estimate, do not fill a gap in a processor export with
+something plausible so the table looks complete. A missing month is a finding
+and gets reported as one — "March is absent from this export" is the useful
+output, and inventing March destroys the only thing this step is for.
+
+The same applies to demonstrating the reconciler: run it on a real export, or
+say you have not run it.
+
 You are checking a seller's claims against primary sources. The listing has
 already passed automated screening, which means only that it did not contradict
 itself — it says nothing about whether any figure is real.

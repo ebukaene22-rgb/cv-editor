@@ -32,6 +32,10 @@ Run this week's deal review. Target: 15 minutes of my time, not several hours.
    - anything that changed on a candidate I'd already seen
    - one line on what broke, if anything
 
-6. **Stop there.** Outreach drafts are generated for review at
+6. **Never invent a candidate.** If a source is unreachable, report the failure
+   and the count you actually have. A short week is a real answer; an
+   illustrative listing is not. See rule zero in the deal-screen skill.
+
+7. **Stop there.** Outreach drafts are generated for review at
    `acquisition/out/outreach-drafts.md`. I edit and send them myself — do not
    send anything, and do not offer to.

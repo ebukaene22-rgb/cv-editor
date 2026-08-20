@@ -12,3 +12,4 @@ acquisition/out/
 
 __pycache__/
 *.pyc
+acquisition/data/mirror/

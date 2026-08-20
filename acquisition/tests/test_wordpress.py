@@ -96,6 +96,56 @@ def test_score() -> None:
            "score matches the brief's formula exactly", f"want {expected}")
 
 
+def test_real_data_guards() -> None:
+    """Two guards added after running the brief's formula over the real directory.
+
+    Both defects were invisible in generated data and obvious in real data, so
+    they are pinned here.
+    """
+    # Guard 1 — the abandonment term is linear and unbounded. Uncapped, a plugin
+    # last touched in 2010 scores 10x on that term alone and outranks a far
+    # bigger, more recently abandoned one.
+    fossil_raw = neglect_score(2_000, 189, 4.8, 0.0)
+    big_raw = neglect_score(50_000, 60, 4.8, 0.0)
+    expect(fossil_raw > big_raw,
+           "uncapped: a 15-year-old 2k-install plugin beats a 5-year-old 50k one",
+           f"{fossil_raw} vs {big_raw}")
+
+    fossil_cap = neglect_score(2_000, 189, 4.8, 0.0, max_abandonment=4.0)
+    big_cap = neglect_score(50_000, 60, 4.8, 0.0, max_abandonment=4.0)
+    expect(big_cap > fossil_cap,
+           "capped: reach decides once both are thoroughly abandoned",
+           f"{big_cap} vs {fossil_cap}")
+    expect(neglect_score(10_000, 72, 4.0, 0.5, max_abandonment=4.0)
+           == neglect_score(10_000, 200, 4.0, 0.5, max_abandonment=4.0),
+           "past the cap, more staleness changes nothing")
+    expect(neglect_score(10_000, 36, 4.0, 0.25, max_abandonment=4.0)
+           == neglect_score(10_000, 36, 4.0, 0.25),
+           "below the cap the score is unchanged from the brief's formula")
+
+    # Guard 2 — the directory counts support threads over the last two months
+    # only, so 17,674 plugins have exactly one. "0 of 1 resolved" is not evidence
+    # of an absent owner, and without a sample floor it scores maximum
+    # disengagement.
+    one_thread = {"slug": "x", "name": "X", "active_installs": 5000, "rating": 90,
+                  "support_threads": 1, "support_threads_resolved": 0,
+                  "last_updated": "2021-01-01 9:00am GMT"}
+    loose = WordPressSource.to_candidate(one_thread, now=NOW, min_support_threads=0)
+    strict = WordPressSource.to_candidate(one_thread, now=NOW, min_support_threads=5)
+    expect(loose.support_resolution_rate == 0.0,
+           "without a sample floor, 0 of 1 reads as total disengagement")
+    expect(strict.support_resolution_rate == 0.5,
+           "with a sample floor, a single thread takes the neutral rate",
+           str(strict.support_resolution_rate))
+    expect(strict.neglect_score < loose.neglect_score,
+           "the floor stops one unanswered thread inflating the score")
+
+    many = dict(one_thread, support_threads=12, support_threads_resolved=1)
+    real = WordPressSource.to_candidate(many, now=NOW, min_support_threads=5)
+    expect(abs(real.support_resolution_rate - 1 / 12) < 0.001,
+           "a real sample is used as observed", str(real.support_resolution_rate))
+
+
 # ------------------------------------------------- volume + ranking at scale
 def _synthetic_pages(count: int = 4000, per_page: int = 100) -> list[dict]:
     """A deterministic corpus shaped like the live `browse=popular` response."""
@@ -167,7 +217,8 @@ def test_paging_stops() -> None:
 def main() -> int:
     print("WORDPRESS.ORG OFF-MARKET — PHASE 2 ACCEPTANCE")
     print("=" * 72)
-    for fn in (test_parsing, test_band, test_score, test_volume, test_paging_stops):
+    for fn in (test_parsing, test_band, test_score, test_real_data_guards,
+               test_volume, test_paging_stops):
         fn()
 
     failed = 0

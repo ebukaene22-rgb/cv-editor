@@ -27,8 +27,8 @@ python .claude/skills/deal-screen/scripts/check_config.py
 # 2. Does the rule engine still catch known-bad listings?
 python acquisition/run.py gate
 
-# 3. Rehearse a full run offline — no network, deterministic, disposable
-python acquisition/run.py demo --fresh
+# 3. See what it finds in the real WordPress.org directory
+python acquisition/run.py real --mirror
 
 # 4. Run the week for real
 python acquisition/run.py weekly --sender "Your Name"
@@ -68,7 +68,7 @@ commands.
 python acquisition/run.py gate                     # acceptance tests (run this first)
 python acquisition/run.py neglect                  # D3 — WordPress.org off-market pull
 python acquisition/run.py marketplace              # D2 — Flippa pull + TrustMRR cross-check
-python acquisition/run.py demo                     # rehearse a full run, offline
+python acquisition/run.py real --mirror            # D3 against the real directory
 python acquisition/run.py screen                   # re-run the engine over the store
 python acquisition/run.py weekly                   # everything, then write D6/D7/D8
 python acquisition/run.py show <id>                # one candidate, in full
@@ -112,32 +112,54 @@ channel-risk classifier so it never depends on model sampling.
 | `test_wordpress.py` | Wire-format parsing, the neglect band, the score formula, ≥200 candidates at volume. |
 | `test_pipeline.py` | Ingestion → cross-check → store → D6/D7/D8, including tracker round-trips. |
 
-### 2. The demo — what does a run actually produce?
+The JSON under `tests/fixtures/` exists to test field mapping — that a price
+parses, that a sponsored listing is re-filtered, that the tracker survives a
+round trip. **It is never a candidate.** Nothing in it may be quoted as
+something the pipeline found; see rule zero in the `deal-screen` skill.
+
+### 2. A real run — what does the pipeline actually find?
 
 ```bash
-python acquisition/run.py demo --fresh
+python acquisition/run.py real --mirror --top 20
 ```
 
-The same code path as `weekly` — same ingestion, same rule engine, same
-writers — with every source replayed from fixtures and every path redirected to
-`out/demo/` and `data/demo/`. Nothing live is contacted and real candidate data
-cannot be touched.
+Real plugins, real install counts, real dates, real URLs. Nothing generated.
 
-The corpus is deliberately wrong in the ways the real thing is wrong: sponsored
-listings outside the price band, a listing whose stated profit exceeds its
-revenue, an "ARR" figure the trailing revenue doesn't support, plugins whose
-rating arrives on the wrong scale. A rehearsal against clean data teaches
-nothing.
+`--mirror` reads two public GitHub mirrors of the WordPress.org directory
+instead of `api.wordpress.org`, for networks where the official API is blocked.
+Provenance is printed on every run and the two are joined on slug:
 
-Marketplace listings and TrustMRR records are committed JSON at
-`tests/fixtures/demo_*.json` — edit them to try a case of your own. The
-WordPress corpus is generated deterministically at run time (`--plugins N`),
-because 4,000 plugin records is not a file anyone should have to read.
+| Field | Source | Freshness |
+|---|---|---|
+| name, active_installs, last_updated, num_ratings | `rix4uni/wordpress-plugins` | ~6 hours |
+| rating, support_threads, support_threads_resolved | `jcmpagel/wordpress-dataset` | 2024 snapshot |
 
-The run also prints a **rule coverage** table: which flag rules had the inputs to
-run at all. A rule that never fires because the source doesn't carry its inputs
-is indistinguishable, in a results table, from a rule that ran and found
-nothing — and the two mean opposite things.
+So reach and abandonment are current; quality and disengagement are from an
+older snapshot. Neither mirror carries `author_profile`, so the plugin page is
+the contact route rather than the author's profile — one click further than the
+API gives you. Drop `--mirror` to use the official API where it is reachable.
+
+Records are reshaped into the exact response the official API returns and pushed
+through the same `to_candidate`, so this exercises the real parsing and scoring
+code rather than a parallel copy of it.
+
+**What the first real run found.** Two scoring defects that a generated corpus
+had passed cleanly through an entire build:
+
+1. **The abandonment term is unbounded.** `months / 18` is linear with no
+   ceiling, so a plugin last touched in 2010 scores 10× on that term and swamps
+   reach, rating and disengagement combined. The top 20 was 1,000-install
+   fossils from 2010–2012, none of which still runs on a current WordPress.
+2. **The disengagement term has no sample floor.** The directory counts support
+   threads over the last two months only, so 17,674 plugins have exactly one and
+   14,232 of those have none resolved. "0 of 1" scored maximum owner
+   disengagement off a single data point.
+
+Both are now guarded by `neglect.max_abandonment_multiple` and
+`neglect.min_support_threads`, both configurable, both defaulting on, and both
+settable to `null` to recover the brief's raw formula. Fixing them moved the top
+of the list from 1,000-install 2010 fossils to 20,000–100,000-install plugins
+abandoned four to eight years ago. The guards are pinned in `test_wordpress.py`.
 
 ### 3. Live — does the real wire format still match?
 
@@ -325,11 +347,23 @@ it just quietly returns nothing, or everything.
 
 ### Egress note
 
-`api.wordpress.org` is blocked by the network policy of the environment this was
-built in, so the live D3 pull has **not** been exercised end to end. The module
-is verified offline against recorded and generated payloads (28 checks, including
-the ≥200-ranked-candidate volume gate), and it will need one live run to confirm
-the wire format before the Phase 2 gate is genuinely closed.
+The environment this was built in blocks `api.wordpress.org`, `wordpress.org`,
+`flippa.com` and `public-api.wordpress.com` at the egress proxy. Consequences,
+stated exactly:
+
+- **D3 has been run on real data** via `real --mirror`, which reads public
+  GitHub mirrors of the same directory. 66,012 real plugins, 44,085 with
+  complete data, 1,352 inside the neglect band. This is what found the two
+  scoring defects above.
+- **D3 against the official API is still unexercised.** The mirror reshapes
+  records into the API's response format and pushes them through the same
+  mapper, so the parsing and scoring code is genuinely tested — but the HTTP
+  paging path in `WordPressSource.fetch_neglect` has only ever run against
+  fixtures. One live `neglect --pages 2` closes that.
+- **D2 has never run on real data.** Both marketplaces are blocked and no
+  reachable mirror of their listings exists. The Flippa and TrustMRR parsers are
+  tested against fixtures only. Those fixtures are field-mapping tests, not
+  candidates, and nothing from them may be quoted as a screening result.
 
 ---
 

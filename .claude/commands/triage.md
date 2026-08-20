@@ -17,5 +17,8 @@ Triage candidate **$1**.
    (`python acquisition/run.py promote $1 contacted`) and show me the draft
    enquiry to edit. Do not send it.
 
+If `$1` is not in the store, say so and stop — do not construct a plausible
+candidate to triage. See rule zero in the deal-screen skill.
+
 Remember: passing every rule means the listing did not contradict itself. It does
 not mean any figure in it is real.
