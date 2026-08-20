@@ -89,6 +89,7 @@ def run(conn, args, cur_ts, rates):
         sell_gbp = to_gbp(c["median"], c["currency"])
         cat = F.categorise(r["title"] or "", r["vendor"] or "")
         econ = F.Economics(category=cat, buyer_region="UK",
+                           seller_country=args.seller_country,
                            vat_registered=args.vat_registered,
                            duty_rate=args.duty, ad_rate=args.ad,
                            postage_charged=args.postage)
@@ -99,7 +100,7 @@ def run(conn, args, cur_ts, rates):
         share = S.share_from_competition(c["n"])
         eo = S.expected_monthly_orders(sig, share_of_market=share)
         score = S.opportunity_score(eo, cm, args.match_conf, args.supply_conf)
-        recs.append({"cm": cm, "margin": margin, "cat": cat, "comp_n": c["n"],
+        recs.append({"cm": cm, "margin": margin, "bd": bd, "cat": cat, "comp_n": c["n"],
                      "buy": buy_gbp, "sell": sell_gbp, "sig": sig,
                      "exp_orders": eo, "score": score, "row": r,
                      "synthetic": c.get("synthetic", False)})
@@ -108,9 +109,16 @@ def run(conn, args, cur_ts, rates):
     syn = ec.synthetic
     tag = "  [SYNTHETIC COMPS - measures machinery, not market]" if syn else ""
     print(f"\n{'='*78}\nFUNNEL{tag}\n{'='*78}")
+    _, _, probe = F.Economics(
+        seller_country=args.seller_country,
+        vat_registered=args.vat_registered).contribution(10, 20, 500)
     print(f"snapshot {cur_ts}   stores={stores}   "
-          f"vat_registered={args.vat_registered}  duty={args.duty:.0%}  "
-          f"ad={args.ad:.0%}\n")
+          f"seller={args.seller_country} vat_reg={args.vat_registered} "
+          f"fee_tax={probe['fee_tax']:.0%}  duty={args.duty:.0%}  "
+          f"ad={args.ad:.0%}")
+    if probe["fee_tax_note"]:
+        print(f"  !! {probe['fee_tax_note']}")
+    print()
 
     matched = len(recs)
     m15 = [r for r in recs if r["margin"] is not None and r["margin"] >= 0.15]
@@ -149,6 +157,11 @@ def run(conn, args, cur_ts, rates):
     print(f"\n  CONTRIBUTION PER ORDER (GBP, all {len(recs)} comped)")
     print(f"    median {pct(cms,.5):7.2f}   P75 {pct(cms,.75):7.2f}   "
           f"P90 {pct(cms,.9):7.2f}   max {max(cms):7.2f}")
+    revs = [r["bd"]["cm_rev_pct"] for r in recs if r["bd"].get("cm_rev_pct") is not None]
+    rois = [r["bd"]["roi_cost"] for r in recs if r["bd"].get("roi_cost") is not None]
+    if revs and rois:
+        print(f"    CM/revenue median {pct(revs,.5)*100:5.1f}%   "
+              f"ROI-on-cost median {pct(rois,.5)*100:5.1f}%")
     neg = sum(1 for x in cms if x <= 0)
     print(f"    negative or zero: {neg:,} of {len(cms):,} "
           f"({neg/len(cms)*100:.0f}%)")

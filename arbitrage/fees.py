@@ -26,9 +26,15 @@ Contribution per order:
        - VAT on those eBay fees (if not VAT-registered)
        - ExpectedReturnCost
 
-VAT note: a VAT-registered business reclaims input VAT on eBay's fees, so it
-is not a cost. An unregistered seller eats it. That is a ~2pp swing on a
-typical order, so it is a flag, not an assumption.
+Fee-tax note: what tax eBay adds to its OWN fees depends on where the
+SELLER is established, not on the marketplace site. A UK-established
+VAT-registered business is charged 20% on fees but reclaims it (net zero);
+unregistered eats it. A UAE-established seller on ebay.co.uk is a different
+regime entirely (UAE VAT is 5%, and whether eBay's billing entity applies it
+needs checking against an actual eBay invoice). So the rate is a seller
+profile input via `fee_tax_for()`, never a hard-coded 20%. Unknown
+jurisdictions default to 0 WITH A WARNING FLAG rather than a silent guess —
+the flag must reach the report.
 
 Rates verified Aug 2026 against current eBay UK business-seller guidance.
 Category rates below are the published band midpoints, not a full category
@@ -61,7 +67,25 @@ PER_ORDER_LOW = 0.30      # orders <= PER_ORDER_THRESHOLD
 PER_ORDER_HIGH = 0.40     # orders above it (Feb 2026 increase)
 PER_ORDER_THRESHOLD = 10.0
 REG_OP_FEE = 0.0035       # regulatory operating fee
-VAT_RATE = 0.20           # VAT charged on eBay's fees
+
+
+def fee_tax_for(seller_country, vat_registered=False):
+    """
+    -> (effective_rate_on_fees, note_or_None).
+
+    Effective = what actually sticks as a cost after any reclaim. Only
+    jurisdictions actually verified belong here; anything else returns 0
+    plus a warning note that must be surfaced, not swallowed.
+    """
+    c = (seller_country or "").upper()
+    if c in ("GB", "UK"):
+        return (0.0, None) if vat_registered else (0.20, None)
+    if c == "AE":
+        # UAE VAT is 5%; whether eBay's billing entity charges it on seller
+        # fees for a UAE-established seller must be verified against a real
+        # eBay invoice before this number is trusted.
+        return 0.05, "AE fee-tax UNVERIFIED: check an actual eBay invoice"
+    return 0.0, f"fee tax for seller country '{seller_country}' unknown; using 0"
 
 
 class Economics:
@@ -71,7 +95,8 @@ class Economics:
     """
 
     def __init__(self, category="default", buyer_region="UK",
-                 vat_registered=True, ad_rate=0.0, duty_rate=0.0,
+                 seller_country="GB", vat_registered=False,
+                 ad_rate=0.0, duty_rate=0.0,
                  return_rate=0.06, return_cost_share=0.5,
                  inbound_ship_base=2.50, inbound_ship_per_kg=4.00,
                  outbound_ship_base=2.90, outbound_ship_per_kg=1.60,
@@ -79,7 +104,8 @@ class Economics:
         self.category = category
         self.fvf = FVF_BY_CATEGORY.get(category, FVF_BY_CATEGORY["default"])
         self.intl = INTL_FEE.get(buyer_region, INTL_FEE["OTHER"])
-        self.vat_registered = vat_registered
+        self.fee_tax, self.fee_tax_note = fee_tax_for(seller_country,
+                                                      vat_registered)
         self.ad_rate = ad_rate                 # Promoted Listings, if used
         self.duty_rate = duty_rate
         self.return_rate = return_rate
@@ -115,17 +141,19 @@ class Economics:
                 + gross * self.intl
                 + gross * self.ad_rate
                 + per_order)
-        if not self.vat_registered:
-            fees *= (1 + VAT_RATE)
-        return fees
+        return fees * (1 + self.fee_tax)
 
     # -- headline ----------------------------------------------------------
     def contribution(self, supplier_cost, sell_price, grams):
         """
-        -> (contribution, margin_on_cost, breakdown dict).
+        -> (contribution, roi_on_cost, breakdown dict).
 
-        margin is expressed on invested cost, which is what decides how fast
-        working capital recycles. Margin on revenue is the vanity version.
+        Two margins, answering different questions, both in the breakdown:
+          cm_rev_pct  contribution / revenue -- the underlying economics of
+                      the sales business
+          roi_cost    contribution / invested cost -- how hard working
+                      capital works per cycle (GMROI needs turn time, which
+                      does not exist until something has actually sold)
         """
         if supplier_cost is None or sell_price is None or supplier_cost <= 0:
             return None, None, {}
@@ -136,10 +164,13 @@ class Economics:
         returns = self.return_rate * self.return_cost_share * (out + fees)
         cm = gross - inb - out - fees - returns
         invested = inb
-        return cm, (cm / invested if invested else None), {
+        roi = cm / invested if invested else None
+        return cm, roi, {
             "gross": gross, "inbound": inb, "outbound": out,
             "ebay_fees": fees, "returns": returns, "invested": invested,
-            "fvf_rate": self.fvf, "category": self.category}
+            "roi_cost": roi, "cm_rev_pct": cm / gross if gross else None,
+            "fvf_rate": self.fvf, "category": self.category,
+            "fee_tax": self.fee_tax, "fee_tax_note": self.fee_tax_note}
 
 
 def categorise(title, vendor=""):

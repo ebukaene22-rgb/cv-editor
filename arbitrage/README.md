@@ -156,9 +156,20 @@ CM = Revenue − SupplierCost − InboundShip − Duty − OutboundShip
    − ExpectedReturnCost
 ```
 
-Margin is reported **on invested cost** (decides working-capital recycle
-speed), not on revenue. `fees.categorise()` maps titles into FVF bands,
-falling back to the *higher* default band when unsure.
+Two margins are reported, answering different questions: **CM/revenue**
+(the underlying economics of the sales business) and **ROI on invested
+cost** (how hard working capital works per cycle). GMROI comes later — it
+needs turn time, which doesn't exist until something has sold.
+
+Tax on eBay's own fees is a **seller-profile input, not a constant**: it
+depends on where the selling entity is established, not on the marketplace
+site. `fees.fee_tax_for()` knows GB (20%, reclaimable if VAT-registered)
+and AE (5%, flagged UNVERIFIED until checked against a real eBay invoice);
+unknown jurisdictions get 0 plus a warning that propagates to every report.
+Commands default to `--seller-country AE`.
+
+`fees.categorise()` maps titles into FVF bands, falling back to the
+*higher* default band when unsure.
 
 ## Availability telemetry (`signals.py`)
 
@@ -189,6 +200,38 @@ Competitor count feeds the demand estimate (share-of-market shrinks with
 crowding) instead of being an arbitrary divisor. `expected_monthly_orders` is
 a structured estimator with visible assumptions, not a fitted model — fitting
 one requires sales outcomes that don't exist until the thing has been traded.
+
+## The review loop (`scan.py review / ingest / labels`)
+
+Sold-price truth lives in eBay Product Research (Terapeak): real sold
+prices, 90-day sold counts, sell-through — dashboard-only, login-walled,
+and deliberately **not automated** (ToS, brittleness, and no need: at 10–30
+candidates/day manual lookup is fine).
+
+```bash
+python3 scan.py review -n 30          # -> shortlist.csv + frozen features
+# fill 3 columns per row from Product Research (~1 min each)
+python3 scan.py ingest shortlist.csv  # labels stored against frozen features
+python3 scan.py labels                # what the dataset says so far
+```
+
+The sheet carries every automated signal (supply cost, markdown, est CM,
+ROI-on-cost, CM/revenue, active median/p25/sellers, stockout signal, a
+prefilled Terapeak deep link) and three blank columns: `manual_sold_median`,
+`manual_sold_90d`, `manual_verdict` (viable/marginal/dead).
+
+**Features are frozen at sheet time** into the `candidates` table; ingest
+only fills manual columns on the frozen row. Labels joined against live
+data would drift between shortlisting and labeling and contaminate every
+correlation. Already-labeled products are skipped on the next `review` —
+review minutes are the scarce resource.
+
+The product is the labeled dataset: after 100–200 rows, `labels` shows
+viable-rate by frozen signal (depletion cycles, competition, markdown
+depth, spread, region gap) against the base rate, plus the sold/asking
+ratio that calibrates every future active-comp estimate. That's the moment
+the scanner stops being heuristic and starts being learnable. Under n=100
+the report says "noise" and means it.
 
 ## The funnel (`scan.py funnel`)
 

@@ -371,6 +371,29 @@ def cmd_funnel(args):
     FN.run(conn, args, cur, fx_rates(conn))
 
 
+
+def cmd_review(args):
+    """Emit a Terapeak review sheet; freeze features into `candidates`."""
+    import review as RV
+    conn = db()
+    cur, _ = latest_two(conn)
+    if not cur:
+        sys.exit("no snapshots yet")
+    RV.generate(conn, args, cur, fx_rates(conn))
+
+
+def cmd_ingest(args):
+    """Read a filled review sheet back in as labels."""
+    import review as RV
+    RV.ingest(db(), args.file)
+
+
+def cmd_labels(args):
+    """What the labeled dataset says so far."""
+    import review as RV
+    RV.report(db())
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -388,14 +411,30 @@ def main():
     f.add_argument("--duty", type=float, default=0.0)
     f.add_argument("--ad", type=float, default=0.0, help="promoted listings rate")
     f.add_argument("--postage", type=float, default=0.0, help="postage charged to buyer")
-    f.add_argument("--vat-registered", action="store_true", default=True)
-    f.add_argument("--no-vat-registered", dest="vat_registered", action="store_false")
+    f.add_argument("--seller-country", default="AE",
+                   help="where the selling entity is established (fee-tax regime)")
+    f.add_argument("--vat-registered", action="store_true", default=False)
     f.add_argument("--match-conf", type=float, default=0.6,
                    help="P(title-matched comp is the same product)")
     f.add_argument("--supply-conf", type=float, default=0.5,
                    help="P(supplier will actually sell to us at this price)")
     f.add_argument("--synthetic", action="store_true")
     f.set_defaults(fn=cmd_funnel)
+    r = sub.add_parser("review")
+    r.add_argument("-n", type=int, default=30, help="shortlist size")
+    r.add_argument("--out", default="shortlist.csv")
+    r.add_argument("--min-cm", type=float, default=5.0, help="min est GBP contribution")
+    r.add_argument("--duty", type=float, default=0.0)
+    r.add_argument("--seller-country", default="AE",
+                   help="where the selling entity is established (fee-tax regime)")
+    r.add_argument("--vat-registered", action="store_true", default=False)
+    r.add_argument("--synthetic", action="store_true")
+    r.set_defaults(fn=cmd_review)
+    g = sub.add_parser("ingest")
+    g.add_argument("file")
+    g.set_defaults(fn=cmd_ingest)
+    lb = sub.add_parser("labels")
+    lb.set_defaults(fn=cmd_labels)
     a = ap.parse_args()
     a.fn(a)
 
