@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS candidates (
   domain        TEXT NOT NULL,
   product_key   TEXT NOT NULL,
   title         TEXT, vendor TEXT, region TEXT, category TEXT,
+  supply_url    TEXT,
   -- frozen supply-side features
   supply_gbp    REAL,     -- cheapest in-stock variant, GBP
   list_gbp      REAL,     -- compare-at price, GBP
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS candidates (
 );
 """
 
-AUTO_COLS = ["id", "candidate", "supply_gbp", "list_gbp", "markdown_pct",
+AUTO_COLS = ["id", "candidate", "supply_url", "supply_gbp", "list_gbp", "markdown_pct",
              "est_cm_gbp", "est_roi_cost_pct", "est_cm_rev_pct",
              "active_median_gbp",
              "active_p25_gbp", "active_sellers", "stockout_signal",
@@ -181,7 +182,7 @@ def generate(conn, args, cur_ts, rates):
 
     rows = conn.execute("""
         SELECT domain, region, sku, title, vendor, price, compare, currency,
-               grams
+               grams, url
         FROM obs WHERE ts=? AND available=1 AND price>0
               AND compare IS NOT NULL AND compare > price""",
         (cur_ts,)).fetchall()
@@ -244,14 +245,15 @@ def generate(conn, args, cur_ts, rates):
         cur = conn.execute("""
             INSERT OR IGNORE INTO candidates
               (created_ts, snapshot_ts, domain, product_key, title, vendor,
-               region, category, supply_gbp, list_gbp, markdown, n_variants,
+               region, category, supply_url, supply_gbp, list_gbp, markdown,
+               n_variants,
                grams, region_gap, dep_conf, dep_cycles, dep_stockouts,
                dep_oos_frac, comp_median, comp_p25, comp_n, comp_synthetic,
                active_spread, est_cm, est_roi_cost, est_cm_rev,
                seller_country, fee_tax)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (now(), cur_ts, r["domain"], kt, r["title"], r["vendor"],
-             r["region"], cat, p["gbp"], list_gbp,
+             r["region"], cat, r["url"], p["gbp"], list_gbp,
              1 - r["price"] / r["compare"], p["n"], r["grams"], gap.get(kt),
              sig.get("confidence"), sig.get("cycles"), sig.get("stockouts"),
              sig.get("oos_frac"), med, p25, c["n"],
@@ -268,7 +270,9 @@ def generate(conn, args, cur_ts, rates):
     for cid, p, r, c, med, p25, cm, margin, bd, cat, sig in out:
         stk = (f"{sig.get('confidence','none')}"
                f"/{sig.get('cycles',0)}cyc/{sig.get('stockouts',0)}so")
-        w.writerow([cid, p["key"], f"{p['gbp']:.2f}",
+        w.writerow([cid, p["key"],
+                    r["url"] or f"https://{r['domain']}",
+                    f"{p['gbp']:.2f}",
                     f"{to_gbp(r['compare'], r['currency']):.2f}",
                     f"{(1 - r['price']/r['compare'])*100:.0f}",
                     f"{cm:.2f}", f"{margin*100:.0f}",
