@@ -108,7 +108,8 @@ AUTO_COLS = ["id", "candidate", "sku", "product_type", "supply_url",
              "est_cm_gbp", "est_roi_cost_pct", "est_cm_rev_pct",
              "active_median_gbp",
              "active_p25_gbp", "active_sellers", "stockout_signal",
-             "category", "store", "terapeak_query", "terapeak_url"]
+             "category", "store", "terapeak_query", "sold_search_url",
+             "terapeak_url"]
 MANUAL_COLS = ["match_status", "match_query_used", "match_confidence",
                "match_notes",
                "manual_sold_median", "manual_sold_90d", "manual_verdict",
@@ -168,6 +169,18 @@ def terapeak_url(query):
     return ("https://www.ebay.co.uk/sh/research?" + urllib.parse.urlencode(
         {"marketplace": "EBAY-GB", "keywords": query, "dayRange": "90",
          "tabName": "SOLD"}))
+
+
+def sold_search_url(query):
+    """
+    Regular eBay search with Sold+Completed filters -- same 90-day sold data
+    Terapeak draws on, but through eBay's forgiving browse search instead of
+    Terapeak's strict all-tokens-must-match keyword engine. In practice this
+    finds sold listings Terapeak's search misses; use it as the primary
+    lookup and Terapeak for trend depth/confirmation.
+    """
+    return ("https://www.ebay.co.uk/sch/i.html?" + urllib.parse.urlencode(
+        {"_nkw": query, "LH_Sold": "1", "LH_Complete": "1"}))
 
 
 CAND_CSV = "history/candidates.csv"
@@ -333,7 +346,8 @@ def generate(conn, args, cur_ts, rates):
                     f"{cm:.2f}", f"{margin*100:.0f}",
                     f"{(bd.get('cm_rev_pct') or 0)*100:.0f}",
                     f"{med:.2f}", f"{p25:.2f}", c["n"], stk, cat,
-                    r["domain"], p["key"], terapeak_url(p["key"])]
+                    r["domain"], p["key"], sold_search_url(p["key"]),
+                    terapeak_url(p["key"])]
                    + [""] * len(MANUAL_COLS))
     dump_candidates(conn)
     syn = "  [SYNTHETIC COMPS]" if ec.synthetic else ""
