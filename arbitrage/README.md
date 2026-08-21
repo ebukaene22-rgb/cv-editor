@@ -220,6 +220,23 @@ ROI-on-cost, CM/revenue, active median/p25/sellers, stockout signal, a
 prefilled Terapeak deep link) and three blank columns: `manual_sold_median`,
 `manual_sold_90d`, `manual_verdict` (viable/marginal/dead).
 
+**Identity is a first-class stage.** Every reviewed row gets a
+`match_status` — `exact` (same brand, product line, type, and materially
+important variant/size/pack), `close` (family match, non-critical variant
+differs), `weak`, or `no_match` — plus `match_query_used`,
+`match_confidence`, `match_notes`. Only `exact` sold prices feed
+profitability; `close` is directional context; `weak`/`no_match` sold data
+is discarded at ingest. Timebox: 2–3 minutes without a trustworthy exact
+match → `no_match`, move on — the batch measures the matching bottleneck,
+not rescue rate.
+
+**Identifier audit:** UPC/EAN/GTIN is structurally absent from public
+Shopify feeds (`barcode` is Admin-API-only), so no fuzzy-matching
+substitute is built. Retailer SKUs cover ~98% of observations and are
+style codes on branded stores — surfaced on the sheet as a secondary
+search key. `product_type` is captured from the feed for match-rate
+reporting by category.
+
 **Features are frozen at sheet time** into the `candidates` table; ingest
 only fills manual columns on the frozen row. Labels joined against live
 data would drift between shortlisting and labeling and contaminate every

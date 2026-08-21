@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS obs (
   available INTEGER,
   grams     INTEGER,
   url       TEXT,
+  ptype     TEXT,
   PRIMARY KEY (ts, domain, sku)
 );
 CREATE INDEX IF NOT EXISTS ix_sku    ON obs(sku);
@@ -146,6 +147,7 @@ def shopify(domain, pages=4):
                     "grams": v.get("grams"),
                     "url": (f"https://{domain}/products/{p['handle']}"
                             f"?variant={v['id']}" if p.get("handle") else None),
+                    "ptype": p.get("product_type") or None,
                 }
         time.sleep(0.4)
 
@@ -174,8 +176,10 @@ def woo(domain, pages=4):
                 reg = float(reg) / minor if reg else None
             except ValueError:
                 reg = None
+            cats = p.get("categories") or []
             yield {
                 "url": p.get("permalink"),
+                "ptype": cats[0].get("name") if cats else None,
                 "sku": (p.get("sku") or "").strip() or f"wid:{p['id']}",
                 "title": re.sub(r"<[^>]+>", "", p.get("name", ""))[:160],
                 "vendor": None,
@@ -225,10 +229,10 @@ def cmd_snapshot(args):
         for r in rows:                       # first observation of a SKU wins
             seen.setdefault(r["sku"], r)
         conn.executemany(
-            "INSERT OR REPLACE INTO obs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO obs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [(ts, s["domain"], s["group"], s["region"], r["sku"], r["title"],
               r["vendor"], r["price"], r["compare"], s["currency"],
-              r["available"], r["grams"], r.get("url"))
+              r["available"], r["grams"], r.get("url"), r.get("ptype"))
              for r in seen.values()])
         conn.commit()
         instock = sum(r["available"] for r in seen.values())
@@ -410,7 +414,7 @@ def cmd_export(args):
     conn = db()
     os.makedirs("history", exist_ok=True)
     cols = ["ts","domain","grp","region","sku","title","vendor","price",
-            "compare","currency","available","grams","url"]
+            "compare","currency","available","grams","url","ptype"]
     n = 0
     for (ts,) in conn.execute("SELECT DISTINCT ts FROM obs ORDER BY ts"):
         path = os.path.join("history", ts.replace(":", "") + ".csv.gz")
@@ -441,14 +445,14 @@ def cmd_rebuild(args):
                       float(r["compare"]) if r["compare"] else None,
                       r["currency"], int(r["available"]),
                       int(r["grams"]) if r["grams"] else None,
-                      r.get("url") or None)
+                      r.get("url") or None, r.get("ptype") or None)
                      for r in rd]
         if batch and batch[0][0] in have:
             continue
         conn.executemany(
             "INSERT INTO obs (ts,domain,grp,region,sku,title,vendor,price,"
-            "compare,currency,available,grams,url) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "compare,currency,available,grams,url,ptype) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             batch)
         n += 1
         rows += len(batch)

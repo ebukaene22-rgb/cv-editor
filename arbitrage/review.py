@@ -14,6 +14,33 @@ Terapeak:
     scan.py ingest FILE     -> labels stored, joined to frozen features
     scan.py labels          -> what the labeled dataset says so far
 
+Product identity is a FIRST-CLASS STAGE, before sold-price validation.
+Manual matching proved unreliable when treated as an implicit step: messy
+titles, no visible identifiers, and the temptation to force a fuzzy match
+that contaminates the economics. So every row is labeled with match_status
+before any sold price counts:
+
+  exact     same brand, product line, product type, and materially
+            important variant/size/pack
+  close     same product family, a non-critical variant differs
+  weak      only broadly similar product
+  no_match  no trustworthy equivalent found
+
+Only `exact` feeds profitability. `close` is stored as directional context.
+`weak`/`no_match` sold prices are DISCARDED at ingest.
+
+TIMEBOX RULE: 2-3 minutes per row without a trustworthy exact match ->
+mark no_match and move on. The batch measures the matching bottleneck; it
+does not rescue candidates.
+
+Identifier audit (what the public feeds actually give us): UPC/EAN/GTIN is
+structurally absent -- Shopify only exposes `barcode` via the authed Admin
+API, so no fuzzy substitute is built. Retailer SKUs cover ~98% of rows and
+are style codes on branded stores (Allbirds A11718M080, Gymshark
+B5C9W-PCQR-M) that eBay sellers often put in titles/item specifics -- the
+sheet surfaces them for use as a secondary search. product_type is captured
+for match-rate-by-category reporting.
+
 The point of the exercise is not the verdicts themselves but the LABELED
 DATASET: after 100-200 rows we can test which automated signals (spread,
 competition, stockouts, markdown depth, brand, region gap) actually predict
@@ -44,7 +71,7 @@ CREATE TABLE IF NOT EXISTS candidates (
   domain        TEXT NOT NULL,
   product_key   TEXT NOT NULL,
   title         TEXT, vendor TEXT, region TEXT, category TEXT,
-  supply_url    TEXT,
+  supply_url    TEXT, sku TEXT, ptype TEXT,
   -- frozen supply-side features
   supply_gbp    REAL,     -- cheapest in-stock variant, GBP
   list_gbp      REAL,     -- compare-at price, GBP
@@ -61,6 +88,11 @@ CREATE TABLE IF NOT EXISTS candidates (
   -- frozen economics
   est_cm        REAL, est_roi_cost REAL, est_cm_rev REAL,
   seller_country TEXT, fee_tax REAL,
+  -- manual identity labels (filled BEFORE sold prices)
+  match_status       TEXT,     -- exact | close | weak | no_match
+  match_query_used   TEXT,
+  match_confidence   REAL,     -- 0-1, reviewer's own confidence
+  match_notes        TEXT,
   -- manual labels (from Product Research / Terapeak)
   manual_sold_median REAL,
   manual_sold_90d    INTEGER,
@@ -71,15 +103,18 @@ CREATE TABLE IF NOT EXISTS candidates (
 );
 """
 
-AUTO_COLS = ["id", "candidate", "supply_url", "supply_local", "supply_gbp",
-             "list_gbp", "markdown_pct",
+AUTO_COLS = ["id", "candidate", "sku", "product_type", "supply_url",
+             "supply_local", "supply_gbp", "list_gbp", "markdown_pct",
              "est_cm_gbp", "est_roi_cost_pct", "est_cm_rev_pct",
              "active_median_gbp",
              "active_p25_gbp", "active_sellers", "stockout_signal",
              "category", "store", "terapeak_query", "terapeak_url"]
-MANUAL_COLS = ["manual_sold_median", "manual_sold_90d", "manual_verdict",
+MANUAL_COLS = ["match_status", "match_query_used", "match_confidence",
+               "match_notes",
+               "manual_sold_median", "manual_sold_90d", "manual_verdict",
                "manual_notes"]
 VERDICTS = {"viable", "marginal", "dead"}
+MATCH_STATUSES = {"exact", "close", "weak", "no_match"}
 
 
 def now():
@@ -183,7 +218,7 @@ def generate(conn, args, cur_ts, rates):
 
     rows = conn.execute("""
         SELECT domain, region, sku, title, vendor, price, compare, currency,
-               grams, url
+               grams, url, ptype
         FROM obs WHERE ts=? AND available=1 AND price>0
               AND compare IS NOT NULL AND compare > price""",
         (cur_ts,)).fetchall()
@@ -246,15 +281,17 @@ def generate(conn, args, cur_ts, rates):
         cur = conn.execute("""
             INSERT OR IGNORE INTO candidates
               (created_ts, snapshot_ts, domain, product_key, title, vendor,
-               region, category, supply_url, supply_gbp, list_gbp, markdown,
-               n_variants,
+               region, category, supply_url, sku, ptype, supply_gbp,
+               list_gbp, markdown, n_variants,
                grams, region_gap, dep_conf, dep_cycles, dep_stockouts,
                dep_oos_frac, comp_median, comp_p25, comp_n, comp_synthetic,
                active_spread, est_cm, est_roi_cost, est_cm_rev,
                seller_country, fee_tax)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (now(), cur_ts, r["domain"], kt, r["title"], r["vendor"],
-             r["region"], cat, r["url"], p["gbp"], list_gbp,
+             r["region"], cat, r["url"],
+             None if (r["sku"] or "").startswith(("gid:", "wid:")) else r["sku"],
+             r["ptype"], p["gbp"], list_gbp,
              1 - r["price"] / r["compare"], p["n"], r["grams"], gap.get(kt),
              sig.get("confidence"), sig.get("cycles"), sig.get("stockouts"),
              sig.get("oos_frac"), med, p25, c["n"],
@@ -271,7 +308,8 @@ def generate(conn, args, cur_ts, rates):
     for cid, p, r, c, med, p25, cm, margin, bd, cat, sig in out:
         stk = (f"{sig.get('confidence','none')}"
                f"/{sig.get('cycles',0)}cyc/{sig.get('stockouts',0)}so")
-        w.writerow([cid, p["key"],
+        sku = "" if (r["sku"] or "").startswith(("gid:", "wid:")) else (r["sku"] or "")
+        w.writerow([cid, p["key"], sku, r["ptype"] or "",
                     r["url"] or f"https://{r['domain']}",
                     f"{r['currency']} {r['price']:.2f}",   # as the store shows it
                     f"{p['gbp']:.2f}",
@@ -293,8 +331,19 @@ def generate(conn, args, cur_ts, rates):
         print(f"!! {probe['fee_tax_note']}")
     if skipped_labeled:
         print(f"skipped {skipped_labeled} already-labeled products")
-    print("fill manual_sold_median / manual_sold_90d / manual_verdict "
-          f"(one of {sorted(VERDICTS)}), then:  scan.py ingest {args.out}")
+    print(f"""
+REVIEW RULES (identity first, economics second):
+  1. match_status is REQUIRED per reviewed row: exact | close | weak | no_match
+     exact = same brand, product line, type, and materially important
+     variant/size/pack. When in doubt, it is not exact.
+  2. Only `exact` rows may carry manual_sold_median / manual_sold_90d for
+     economics. `close` sold data is kept as directional context only.
+     weak/no_match sold data is discarded at ingest.
+  3. TIMEBOX: 2-3 min without a trustworthy exact match -> no_match, move on.
+     This batch measures the matching bottleneck, not rescue rate.
+  4. The sku column is the retailer style code -- try it as a second search
+     if the title query fails; note what worked in match_query_used.
+Then:  scan.py ingest {args.out}""")
 
 
 # ------------------------------------------------------------------ ingest
@@ -303,13 +352,26 @@ def ingest(conn, path):
     conn.executescript(SCHEMA)
     ok = bad = blank = 0
     errors = []
+    discarded_sold = 0
     with open(path, newline="") as f:
         for i, row in enumerate(csv.DictReader(f), start=2):
+            ms = (row.get("match_status") or "").strip().lower().replace("-", "_")
             verdict = (row.get("manual_verdict") or "").strip().lower()
-            if not verdict:
+            touched = ms or verdict or (row.get("manual_sold_median") or "").strip()
+            if not touched:
                 blank += 1
                 continue
-            if verdict not in VERDICTS:
+            if not ms:
+                errors.append(f"  line {i}: reviewed but match_status missing "
+                              f"(one of {sorted(MATCH_STATUSES)})")
+                bad += 1
+                continue
+            if ms not in MATCH_STATUSES:
+                errors.append(f"  line {i}: match_status '{ms}' not in "
+                              f"{sorted(MATCH_STATUSES)}")
+                bad += 1
+                continue
+            if verdict and verdict not in VERDICTS:
                 errors.append(f"  line {i}: verdict '{verdict}' not in "
                               f"{sorted(VERDICTS)}")
                 bad += 1
@@ -326,15 +388,26 @@ def ingest(conn, path):
             try:
                 sold_med = num("manual_sold_median")
                 sold_90 = num("manual_sold_90d", int)
+                mconf = num("match_confidence")
             except ValueError:
-                errors.append(f"  line {i}: non-numeric sold fields")
+                errors.append(f"  line {i}: non-numeric sold/confidence fields")
                 bad += 1
                 continue
+            if mconf is not None and mconf > 1:
+                mconf = mconf / 100.0          # accept 0-100 as well as 0-1
+            # identity gate: sold prices only survive exact/close matches
+            if ms in ("weak", "no_match") and (sold_med or sold_90):
+                sold_med = sold_90 = None
+                discarded_sold += 1
             n = conn.execute("""
-                UPDATE candidates SET manual_sold_median=?, manual_sold_90d=?,
+                UPDATE candidates SET match_status=?, match_query_used=?,
+                  match_confidence=?, match_notes=?,
+                  manual_sold_median=?, manual_sold_90d=?,
                   manual_verdict=?, manual_notes=?, labeled_ts=?
                 WHERE id=?""",
-                (sold_med, sold_90, verdict,
+                (ms, (row.get("match_query_used") or "").strip() or None,
+                 mconf, (row.get("match_notes") or "").strip() or None,
+                 sold_med, sold_90, verdict or None,
                  (row.get("manual_notes") or "").strip() or None,
                  now(), cid)).rowcount
             if n:
@@ -345,6 +418,9 @@ def ingest(conn, path):
     conn.commit()
     dump_candidates(conn)
     print(f"labeled {ok} rows  ({blank} left blank, {bad} rejected)")
+    if discarded_sold:
+        print(f"  {discarded_sold} weak/no_match rows had sold prices -- "
+              "discarded (identity gate)")
     print(f"labels mirrored to {CAND_CSV} -- commit it")
     for e in errors[:10]:
         print(e)
@@ -355,51 +431,78 @@ def ingest(conn, path):
 def report(conn):
     conn.executescript(SCHEMA)
     rows = conn.execute("SELECT * FROM candidates "
-                        "WHERE manual_verdict IS NOT NULL").fetchall()
+                        "WHERE match_status IS NOT NULL").fetchall()
     total = conn.execute("SELECT COUNT(*) FROM candidates").fetchone()[0]
     if not rows:
-        print(f"no labels yet ({total} candidates sheeted). "
-              "The dataset starts existing when you ingest a filled sheet.")
+        print(f"no labels yet ({total} candidates sheeted).")
         return
     n = len(rows)
-    viable = [r for r in rows if r["manual_verdict"] == "viable"]
-    print(f"labeled {n} of {total} candidates   "
-          f"viable={len(viable)}  marginal="
-          f"{sum(1 for r in rows if r['manual_verdict']=='marginal')}  "
-          f"dead={sum(1 for r in rows if r['manual_verdict']=='dead')}")
 
-    # active asking price vs realised sold price -- the comp-quality check
-    pairs = [(r["comp_median"], r["manual_sold_median"]) for r in rows
-             if r["comp_median"] and r["manual_sold_median"]
-             and not r["comp_synthetic"]]
-    if pairs:
-        ratios = sorted(s / a for a, s in pairs)
-        mid = ratios[len(ratios) // 2]
-        print(f"\nsold/asking ratio (n={len(pairs)}): median {mid:.2f}  "
-              f"min {ratios[0]:.2f}  max {ratios[-1]:.2f}")
-        print("  -> multiply active-comp medians by this before trusting "
-              "estimated CM")
+    # 1+2: match distribution
+    from collections import Counter, defaultdict
+    dist = Counter(r["match_status"] for r in rows)
+    print(f"MATCH DISTRIBUTION  ({n} reviewed of {total} sheeted)")
+    for st in ("exact", "close", "weak", "no_match"):
+        c = dist.get(st, 0)
+        print(f"  {st:<9} {c:>4}  {c/n*100:5.1f}%")
 
-    # which frozen signals separate viable from dead
-    def rate(pred, label):
-        grp = [r for r in rows if pred(r)]
-        if len(grp) < 3:
-            return f"  {label:<38} n={len(grp):<4} (too few)"
-        v = sum(1 for r in grp if r["manual_verdict"] == "viable")
-        return f"  {label:<38} n={len(grp):<4} viable {v/len(grp)*100:4.0f}%"
+    # 3: viability conditional on exact
+    exact = [r for r in rows if r["match_status"] == "exact"]
+    print(f"\nVIABILITY | EXACT MATCH")
+    if not exact:
+        print("  no exact matches yet -- economics has no denominator")
+    else:
+        v = Counter(r["manual_verdict"] or "unjudged" for r in exact)
+        for k in ("viable", "marginal", "dead", "unjudged"):
+            if v.get(k):
+                print(f"  {k:<9} {v[k]:>4}  {v[k]/len(exact)*100:5.1f}%")
+        judged = [r for r in exact if r["manual_verdict"]]
+        if judged:
+            vr = sum(1 for r in judged if r["manual_verdict"] == "viable")
+            print(f"  -> P(viable | exact, judged) = {vr}/{len(judged)} "
+                  f"= {vr/len(judged)*100:.0f}%")
+        pairs = [(r["comp_median"], r["manual_sold_median"]) for r in exact
+                 if r["comp_median"] and r["manual_sold_median"]
+                 and not r["comp_synthetic"]]
+        if pairs:
+            ratios = sorted(s / a for a, s in pairs)
+            print(f"  sold/asking ratio (exact only, n={len(pairs)}): "
+                  f"median {ratios[len(ratios)//2]:.2f}")
 
-    print(f"\nviable rate by frozen signal (base rate "
-          f"{len(viable)/n*100:.0f}%):")
-    print(rate(lambda r: (r["dep_cycles"] or 0) >= 1, "depletion cycles >= 1"))
-    print(rate(lambda r: (r["dep_stockouts"] or 0) >= 1 and
-               (r["dep_cycles"] or 0) == 0, "stockouts only, no cycle"))
-    print(rate(lambda r: (r["comp_n"] or 0) <= 30, "competitors <= 30"))
-    print(rate(lambda r: (r["comp_n"] or 0) > 150, "competitors > 150"))
-    print(rate(lambda r: (r["markdown"] or 0) >= 0.5, "markdown >= 50%"))
-    print(rate(lambda r: (r["active_spread"] or 0) >= 0.3,
-               "active price spread >= 30%"))
-    print(rate(lambda r: r["region_gap"] is not None and r["region_gap"] > .3,
-               "cross-region gap > 30%"))
+    # 4: exact-match rate by store and category
+    def by(key, label):
+        g = defaultdict(lambda: [0, 0])
+        for r in rows:
+            g[r[key] or "?"][0] += 1
+            if r["match_status"] == "exact":
+                g[r[key] or "?"][1] += 1
+        print(f"\nEXACT-MATCH RATE BY {label}")
+        for k, (tot, ex) in sorted(g.items(), key=lambda x: -x[1][0]):
+            print(f"  {str(k)[:34]:<34} n={tot:<4} exact {ex/tot*100:4.0f}%")
+    by("domain", "STORE")
+    by("ptype", "PRODUCT TYPE (source feed)")
+
+    # 5: are missing identifiers driving match failure?
+    print(f"\nIDENTIFIERS vs MATCH FAILURE")
+    has = [r for r in rows if r["sku"]]
+    no = [r for r in rows if not r["sku"]]
+    for lbl, grp in (("has retailer sku", has), ("no sku", no)):
+        if grp:
+            ex = sum(1 for r in grp if r["match_status"] == "exact")
+            nm = sum(1 for r in grp if r["match_status"] == "no_match")
+            print(f"  {lbl:<18} n={len(grp):<4} exact {ex/len(grp)*100:4.0f}%  "
+                  f"no_match {nm/len(grp)*100:4.0f}%")
+    print("  (UPC/EAN/GTIN structurally absent from public Shopify feeds --"
+          "\n   the only identifier available is the retailer style code)")
+
+    fails = [r for r in rows if r["match_status"] in ("weak", "no_match")
+             and r["match_notes"]]
+    if fails:
+        print(f"\n  failure notes ({len(fails)}):")
+        for r in fails[:8]:
+            print(f"    [{r['match_status']}] {(r['title'] or '')[:38]}: "
+                  f"{r['match_notes'][:60]}")
+
     if n < 100:
-        print(f"\n{100 - n} more labels before any of this is worth "
-              "believing; correlations on tiny n are noise with confidence.")
+        print(f"\n{100 - n} more labels before rates here are worth "
+              "believing; small-n percentages are noise with confidence.")
