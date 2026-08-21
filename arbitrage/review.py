@@ -206,6 +206,20 @@ def load_candidates(conn):
     return len(rows)
 
 
+
+
+class _CheckedWriter:
+    """csv.writer that refuses rows whose width differs from the header --
+    a short row silently misaligns manual columns in every spreadsheet."""
+    def __init__(self, f, ncols):
+        self._w = csv.writer(f)
+        self._n = ncols
+
+    def writerow(self, row):
+        if len(row) != self._n:
+            raise ValueError(f"row has {len(row)} fields, header has {self._n}")
+        self._w.writerow(row)
+
 # ------------------------------------------------------------------ review
 
 def generate(conn, args, cur_ts, rates):
@@ -303,8 +317,9 @@ def generate(conn, args, cur_ts, rates):
         out.append((cur.lastrowid, p, r, c, med, p25, cm, margin, bd, cat, sig))
     conn.commit()
 
-    w = csv.writer(open(args.out, "w", newline=""))
-    w.writerow(AUTO_COLS + MANUAL_COLS)
+    header = AUTO_COLS + MANUAL_COLS
+    w = _CheckedWriter(open(args.out, "w", newline=""), len(header))
+    w.writerow(header)
     for cid, p, r, c, med, p25, cm, margin, bd, cat, sig in out:
         stk = (f"{sig.get('confidence','none')}"
                f"/{sig.get('cycles',0)}cyc/{sig.get('stockouts',0)}so")
@@ -318,8 +333,8 @@ def generate(conn, args, cur_ts, rates):
                     f"{cm:.2f}", f"{margin*100:.0f}",
                     f"{(bd.get('cm_rev_pct') or 0)*100:.0f}",
                     f"{med:.2f}", f"{p25:.2f}", c["n"], stk, cat,
-                    r["domain"], p["key"], terapeak_url(p["key"]),
-                    "", "", "", ""])
+                    r["domain"], p["key"], terapeak_url(p["key"])]
+                   + [""] * len(MANUAL_COLS))
     dump_candidates(conn)
     syn = "  [SYNTHETIC COMPS]" if ec.synthetic else ""
     print(f"wrote {len(out)} candidates -> {args.out}{syn}")
