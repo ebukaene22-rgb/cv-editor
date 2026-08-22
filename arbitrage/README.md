@@ -121,9 +121,14 @@ other half — what it resells for, and how crowded that resale is.
 about.** eBay's sold comps live in the Marketplace Insights API (90-day sales
 history), which is a Limited Release keyset that eBay does not currently grant
 to new applicants. The free Browse API returns *active listings only and
-explicitly no sold data*. The sold-listing web UI (`LH_Sold=1`) does show it,
-but 403s from a datacenter IP. So "what it actually sold for" is off the table
-without a paid provider (Keepa for Amazon history) or residential proxies.
+explicitly no sold data*. The sold-listing web UI (`LH_Sold=1`) is behind a
+LOGIN WALL: verified from a residential IP with headed real Chrome, the sold
+filter 302s to signin.ebay.co.uk while the same query without the filter
+returns 200. So no IP tier, proxy, or stealth browser reaches sold data --
+only a logged-in session cookie would, and automating a logged-in session is
+declined here (ToS, and it would put the seller account at risk). "What it
+actually sold for" is therefore a HUMAN step by design: the review loop's
+manual columns, filled from a logged-in browser or Product Research.
 
 That is survivable, because velocity does not have to come from eBay:
 
@@ -200,6 +205,16 @@ Competitor count feeds the demand estimate (share-of-market shrinks with
 crowding) instead of being an arbitrary divisor. `expected_monthly_orders` is
 a structured estimator with visible assumptions, not a fitted model — fitting
 one requires sales outcomes that don't exist until the thing has been traded.
+
+## Vantage-point policy
+
+Availability in public storefront feeds is geo-dependent: the same
+allbirds.eu catalogue shows ~60% in stock from a US-region datacenter and 0%
+from a UAE residential IP. Mixed-vantage snapshots would fake mass
+sellouts/restocks in the depletion history, so **snapshots are taken from one
+vantage point only (the remote environment / CI)**. Local machines run
+verification, comping, and dev against `scan.py rebuild` of the committed
+history -- they do not run `snapshot`+`export`.
 
 ## The review loop (`scan.py review / ingest / labels`)
 
