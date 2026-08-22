@@ -487,6 +487,10 @@ def main():
     f.add_argument("--synthetic", action="store_true")
     f.add_argument("--sold-ratio", type=float, default=0.60,
                    help="PROVISIONAL sold/ask haircut on active comps")
+    f.add_argument("--strict-identity", action="store_true", default=True,
+                   help="title/set/MSRP comp filtering + condition gate")
+    f.add_argument("--no-strict-identity", dest="strict_identity",
+                   action="store_false")
     f.add_argument("--only-group", default=None,
                    help="draw the cohort from one stores.txt group only")
     f.add_argument("--skip-cats", default="",

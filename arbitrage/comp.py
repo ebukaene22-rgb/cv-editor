@@ -98,7 +98,7 @@ class EbayComp:
         `median` is an ASKING price, not a realised sale price.
         """
         mkt = MARKETPLACE.get(region, "EBAY_US")
-        key = hashlib.sha1(f"{mkt}|{query}|{limit}".encode()).hexdigest()
+        key = hashlib.sha1(f"v2|{mkt}|{query}|{limit}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
         if row and time.time() - row[0] < COMP_TTL:
@@ -134,21 +134,23 @@ class EbayComp:
         except Exception:
             return None
         self.calls += 1
-        prices, cur = [], None
+        items, cur = [], None
         for it in d.get("itemSummaries", []) or []:
             p = (it.get("price") or {})
             try:
-                prices.append(float(p["value"]))
+                items.append({"t": it.get("title") or "",
+                              "p": float(p["value"])})
                 cur = cur or p.get("currency")
             except (KeyError, TypeError, ValueError):
                 continue
-        if not prices:
+        if not items:
             return None
-        prices.sort()
+        prices = sorted(i["p"] for i in items)
         return {"median": statistics.median(prices),
                 "p25": prices[max(0, len(prices) // 4 - 1)],
                 "n": int(d.get("total", len(prices))),
-                "currency": cur or "USD", "synthetic": False}
+                "currency": cur or "USD", "synthetic": False,
+                "items": items}
 
     @staticmethod
     def _synthetic(query, mkt):

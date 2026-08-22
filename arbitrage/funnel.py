@@ -19,6 +19,7 @@ import statistics
 from collections import defaultdict
 
 import comp as C
+import identity as I
 import fees as F
 import signals as S
 
@@ -82,6 +83,7 @@ def run(conn, args, cur_ts, rates):
     skip = {s.strip() for s in (args.skip_cats or "").split(",") if s.strip()}
     ec = C.EbayComp(conn, synthetic=args.synthetic)
     recs = []
+    stats = {}
     skipped_cat = 0
     for buy_gbp, q, r in products:
         cat = F.categorise(r["title"] or "", r["vendor"] or "")
@@ -91,6 +93,17 @@ def run(conn, args, cur_ts, rates):
         c = ec.lookup(q, region=r["region"] or "GB")
         if not c:
             continue
+        if args.strict_identity:
+            cond = I.condition_flag(r["title"])
+            if cond:
+                stats["condition_buy_leg"] = stats.get("condition_buy_leg", 0) + 1
+                continue          # refurb/open-box buy vs new comps: no valid comp yet
+            list_gbp_ = to_gbp(r["compare"], r["currency"])
+            fx_ = (rates.get(c["currency"]) or 1.0) / (rates.get("GBP") or 0.79)
+            c = I.clean_comp(c, q, list_gbp=list_gbp_, fx=fx_)
+            if c is None:
+                stats["identity_rejected"] = stats.get("identity_rejected", 0) + 1
+                continue
         # PROVISIONAL realised-price haircut: active ask median materially
         # overstates achievable sold price (manual verification of the first
         # real cohort measured sold/ask around 0.45-0.65). This constant is a
@@ -155,7 +168,14 @@ def run(conn, args, cur_ts, rates):
     line("unique candidate products (deduped)", len(best), len(anomalous), "REAL")
     line("sampled for comping", len(products), len(best), "REAL")
     basis = "SYNTH" if syn else "REAL"
-    line("with a plausible resale match", matched, len(products), basis)
+    line("with a plausible resale match", matched
+         + stats.get("identity_rejected", 0), len(products), basis)
+    if args.strict_identity:
+        line("comp survives identity filter", matched,
+             matched + stats.get("identity_rejected", 0), basis)
+        if stats.get("condition_buy_leg"):
+            print(f"  ({stats['condition_buy_leg']} candidates excluded: "
+                  f"refurb/open-box buy leg, no condition-matched comp)")
     line("contribution margin >= 15% on cost", len(m15), matched, basis)
     line("contribution >= GBP 5/order", len(cm5), len(m15), basis)
     line(f"competitors <= {args.max_competitors}", len(uncrowded), len(cm5), basis)
