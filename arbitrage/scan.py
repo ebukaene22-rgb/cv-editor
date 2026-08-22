@@ -487,6 +487,8 @@ def main():
     f.add_argument("--synthetic", action="store_true")
     f.add_argument("--sold-ratio", type=float, default=0.60,
                    help="PROVISIONAL sold/ask haircut on active comps")
+    f.add_argument("--only-group", default=None,
+                   help="draw the cohort from one stores.txt group only")
     f.add_argument("--skip-cats", default="",
                    help="comma-separated categories to exclude, e.g. clothing,shoes")
     f.set_defaults(fn=cmd_funnel)
@@ -499,6 +501,7 @@ def main():
                    help="where the selling entity is established (fee-tax regime)")
     r.add_argument("--vat-registered", action="store_true", default=False)
     r.add_argument("--synthetic", action="store_true")
+    r.add_argument("--only-group", default=None)
     r.set_defaults(fn=cmd_review)
     g = sub.add_parser("ingest")
     g.add_argument("file")

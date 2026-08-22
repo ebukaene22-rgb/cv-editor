@@ -50,11 +50,13 @@ def run(conn, args, cur_ts, rates):
         "SELECT COUNT(DISTINCT domain) FROM obs WHERE ts=?", (cur_ts,)
     ).fetchone()[0]
 
-    rows = conn.execute("""
+    gf = " AND grp=?" if getattr(args, "only_group", None) else ""
+    params = (cur_ts, args.only_group) if gf else (cur_ts,)
+    rows = conn.execute(f"""
         SELECT domain, region, sku, title, vendor, price, compare, currency,
                grams
-        FROM obs WHERE ts=? AND available=1 AND price > 0""",
-        (cur_ts,)).fetchall()
+        FROM obs WHERE ts=? AND available=1 AND price > 0{gf}""",
+        params).fetchall()
 
     # -------------------------------------------- stage 2: anomaly + dedupe
     anomalous = [r for r in rows
@@ -122,6 +124,8 @@ def run(conn, args, cur_ts, rates):
           f"seller={args.seller_country} vat_reg={args.vat_registered} "
           f"fee_tax={probe['fee_tax']:.0%}  duty={args.duty:.0%}  "
           f"ad={args.ad:.0%}")
+    if getattr(args, "only_group", None):
+        print(f"  cohort restricted to group: {args.only_group}")
     print(f"  realised-price haircut: sold/ask = {args.sold_ratio} "
           f"(PROVISIONAL constant, not yet label-calibrated)"
           + (f"   excluded categories: {args.skip_cats}" if args.skip_cats else ""))

@@ -29,3 +29,18 @@ shopify   www.rhoback.com               USD  US
 shopify   www.stanley1913.com           USD  US  stanley
 shopify   uk.stanley1913.com            GBP  GB  stanley
 shopify   www.aloyoga.com               USD  US
+
+# hard goods cohort -- electronics accessories, kitchen, tools, power
+shopify   peakdesign.com                USD  US  hardgoods
+shopify   satechi.net                   USD  US  hardgoods
+shopify   twelvesouth.com               USD  US  hardgoods
+shopify   nativeunion.com               USD  US  hardgoods
+shopify   fromourplace.com              USD  US  hardgoods
+shopify   fellowproducts.com            USD  US  hardgoods
+shopify   simplemodern.com              USD  US  hardgoods
+shopify   brumate.com                   USD  US  hardgoods
+shopify   bioliteenergy.com             USD  US  hardgoods
+shopify   thejamesbrand.com             USD  US  hardgoods
+shopify   gerbergear.com                USD  US  hardgoods
+shopify   gsioutdoors.com               USD  US  hardgoods
+shopify   goalzero.com                  USD  US  hardgoods

@@ -243,12 +243,14 @@ def generate(conn, args, cur_ts, rates):
     def to_gbp(v, ccy):
         return None if v is None else (v / (rates.get(ccy) or 1.0)) * gbp
 
-    rows = conn.execute("""
+    gf = " AND grp=?" if getattr(args, "only_group", None) else ""
+    params = (cur_ts, args.only_group) if gf else (cur_ts,)
+    rows = conn.execute(f"""
         SELECT domain, region, sku, title, vendor, price, compare, currency,
                grams, url, ptype
         FROM obs WHERE ts=? AND available=1 AND price>0
-              AND compare IS NOT NULL AND compare > price""",
-        (cur_ts,)).fetchall()
+              AND compare IS NOT NULL AND compare > price{gf}""",
+        params).fetchall()
 
     # group variants -> products, keep cheapest in-stock variant
     prods = {}
