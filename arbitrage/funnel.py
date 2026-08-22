@@ -81,11 +81,41 @@ def run(conn, args, cur_ts, rates):
 
     # ------------------------------------------------- stage 3+: economics
     skip = {s.strip() for s in (args.skip_cats or "").split(",") if s.strip()}
+
+    # Target-market retail executability (rule from manual verification of
+    # cohort 2: four Peak Design cases showed a GBP43 eBay "market" while the
+    # brand's own UK store sold the exact SKU at GBP13.50 -- eBay-pool
+    # scarcity is not scarcity while the item is directly purchasable at
+    # retail). Build a GB-retail lookup by SKU: if a finalist's comp median
+    # exceeds in-stock UK retail by >30%, the comp is not executable.
+    uk_retail = {}
+    for row in conn.execute(
+            "SELECT sku, price, currency, available FROM obs "
+            "WHERE ts=? AND region='GB' AND price>0", (cur_ts,)):
+        if row["available"] and row["sku"] and not row["sku"].startswith(("gid:", "wid:")):
+            g = to_gbp(row["price"], row["currency"])
+            if g and (row["sku"] not in uk_retail or g < uk_retail[row["sku"]]):
+                uk_retail[row["sku"]] = g
+
+    # Label-aware: a product a human verified dead stays dead. The four Peak
+    # Design colourways and the Fellow lid passed every automated filter but
+    # were killed by manual retail verification -- those verdicts are in the
+    # candidates table and must gate future shortlists.
+    import review as RV
+    RV.load_candidates(conn)
+    dead_keys = {row[0] for row in conn.execute(
+        "SELECT product_key FROM candidates WHERE manual_verdict='dead'")}
+    labeled_viable = {row[0] for row in conn.execute(
+        "SELECT product_key FROM candidates WHERE manual_verdict='viable'")}
+
     ec = C.EbayComp(conn, synthetic=args.synthetic)
     recs = []
     stats = {}
     skipped_cat = 0
     for buy_gbp, q, r in products:
+        if q.lower() in dead_keys:
+            stats["labeled_dead"] = stats.get("labeled_dead", 0) + 1
+            continue
         cat = F.categorise(r["title"] or "", r["vendor"] or "")
         if cat in skip:
             skipped_cat += 1
@@ -104,6 +134,17 @@ def run(conn, args, cur_ts, rates):
             if c is None:
                 stats["identity_rejected"] = stats.get("identity_rejected", 0) + 1
                 continue
+            ukr = uk_retail.get(r["sku"]) if r["region"] != "GB" else None
+            med_gbp = to_gbp(c["median"], c["currency"])
+            if ukr is not None and med_gbp and med_gbp > ukr * 1.3:
+                stats["not_scarce_at_retail"] = stats.get(
+                    "not_scarce_at_retail", 0) + 1
+                continue          # comp not executable: item in stock at UK retail
+            if ukr is not None and med_gbp:
+                # buyers can always fall back to UK retail: cap the pre-haircut
+                # comp at the in-stock retail price
+                c = dict(c, median=min(c["median"], ukr / (med_gbp / c["median"])))
+            c = dict(c, retail_checked=ukr is not None)
         # PROVISIONAL realised-price haircut: active ask median materially
         # overstates achievable sold price (manual verification of the first
         # real cohort measured sold/ask around 0.45-0.65). This constant is a
@@ -173,6 +214,12 @@ def run(conn, args, cur_ts, rates):
     if args.strict_identity:
         line("comp survives identity filter", matched,
              matched + stats.get("identity_rejected", 0), basis)
+        if stats.get("labeled_dead"):
+            print(f"  ({stats['labeled_dead']} candidates excluded: "
+                  f"human-labeled dead)")
+        if stats.get("not_scarce_at_retail"):
+            line("scarcity survives UK-retail check",
+                 matched, matched + stats.get("not_scarce_at_retail", 0), basis)
         if stats.get("condition_buy_leg"):
             print(f"  ({stats['condition_buy_leg']} candidates excluded: "
                   f"refurb/open-box buy leg, no condition-matched comp)")

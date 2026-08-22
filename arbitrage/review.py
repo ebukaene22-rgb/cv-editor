@@ -329,7 +329,10 @@ def generate(conn, args, cur_ts, rates):
              bd.get("cm_rev_pct"), args.seller_country, bd.get("fee_tax")))
         if cur.rowcount == 0:      # same product+snapshot already sheeted
             continue
-        out.append((cur.lastrowid, p, r, c, med, p25, cm, margin, bd, cat, sig))
+        cid = conn.execute(
+            "SELECT id FROM candidates WHERE domain=? AND product_key=? AND snapshot_ts=?",
+            (r["domain"], kt, cur_ts)).fetchone()[0]
+        out.append((cid, p, r, c, med, p25, cm, margin, bd, cat, sig))
     conn.commit()
 
     header = AUTO_COLS + MANUAL_COLS

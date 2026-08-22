@@ -44,3 +44,8 @@ shopify   thejamesbrand.com             USD  US  hardgoods
 shopify   gerbergear.com                USD  US  hardgoods
 shopify   gsioutdoors.com               USD  US  hardgoods
 shopify   goalzero.com                  USD  US  hardgoods
+shopify   fromourplace.co.uk            GBP  GB  hardgoods
+shopify   twelvesouth.co.uk             GBP  GB  hardgoods
+shopify   satechi.co.uk                 GBP  GB  hardgoods
+shopify   goalzero.co.uk                GBP  GB  hardgoods
+shopify   brumate.co.uk                 GBP  GB  hardgoods
