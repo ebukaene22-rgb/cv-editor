@@ -77,14 +77,23 @@ def run(conn, args, cur_ts, rates):
         sig_by_store[dom] = S.depletion_signals(conn, dom)
 
     # ------------------------------------------------- stage 3+: economics
+    skip = {s.strip() for s in (args.skip_cats or "").split(",") if s.strip()}
     ec = C.EbayComp(conn, synthetic=args.synthetic)
     recs = []
+    skipped_cat = 0
     for buy_gbp, q, r in products:
+        cat = F.categorise(r["title"] or "", r["vendor"] or "")
+        if cat in skip:
+            skipped_cat += 1
+            continue
         c = ec.lookup(q, region=r["region"] or "GB")
         if not c:
             continue
-        sell_gbp = to_gbp(c["median"], c["currency"])
-        cat = F.categorise(r["title"] or "", r["vendor"] or "")
+        # PROVISIONAL realised-price haircut: active ask median materially
+        # overstates achievable sold price (manual verification of the first
+        # real cohort measured sold/ask around 0.45-0.65). This constant is a
+        # placeholder until labeled exact-match rows calibrate it by category.
+        sell_gbp = to_gbp(c["median"], c["currency"]) * args.sold_ratio
         econ = F.Economics(category=cat, buyer_region="UK",
                            seller_country=args.seller_country,
                            vat_registered=args.vat_registered,
@@ -113,6 +122,9 @@ def run(conn, args, cur_ts, rates):
           f"seller={args.seller_country} vat_reg={args.vat_registered} "
           f"fee_tax={probe['fee_tax']:.0%}  duty={args.duty:.0%}  "
           f"ad={args.ad:.0%}")
+    print(f"  realised-price haircut: sold/ask = {args.sold_ratio} "
+          f"(PROVISIONAL constant, not yet label-calibrated)"
+          + (f"   excluded categories: {args.skip_cats}" if args.skip_cats else ""))
     if probe["fee_tax_note"]:
         print(f"  !! {probe['fee_tax_note']}")
     print()

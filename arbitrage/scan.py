@@ -485,6 +485,10 @@ def main():
     f.add_argument("--supply-conf", type=float, default=0.5,
                    help="P(supplier will actually sell to us at this price)")
     f.add_argument("--synthetic", action="store_true")
+    f.add_argument("--sold-ratio", type=float, default=0.60,
+                   help="PROVISIONAL sold/ask haircut on active comps")
+    f.add_argument("--skip-cats", default="",
+                   help="comma-separated categories to exclude, e.g. clothing,shoes")
     f.set_defaults(fn=cmd_funnel)
     r = sub.add_parser("review")
     r.add_argument("-n", type=int, default=30, help="shortlist size")
