@@ -460,6 +460,82 @@ def cmd_rebuild(args):
     print(f"loaded {n} snapshot(s), {rows:,} rows")
 
 
+
+def cmd_recomp(args):
+    """
+    Instrumentation only (no funnel logic): re-fetch fresh clean comp
+    distributions for every frozen shortlist candidate and append a
+    timestamped record to history/comp-track.csv. Feeds the ask-decay
+    diagnostic: median ask at t+1/3/5/7 days after source markdown.
+    """
+    import csv as _csv
+    import comp as C, identity as I, review as RV
+    conn = db()
+    RV.load_candidates(conn)
+    cur, _ = latest_two(conn)
+    rates = fx_rates(conn)
+    gbp = rates.get("GBP") or 0.79
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cands = conn.execute(
+        "SELECT DISTINCT product_key, region, list_gbp, sku, domain "
+        "FROM candidates").fetchall()
+    # bust the cache for exactly these keys so the fetch is genuinely fresh
+    ec = C.EbayComp(conn)
+    out_path = os.path.join("history", "comp-track.csv")
+    new_file = not os.path.exists(out_path)
+    f = open(out_path, "a", newline="")
+    w = _csv.writer(f)
+    if new_file:
+        w.writerow(["ts", "product_key", "region", "n_clean", "n_raw",
+                    "min_gbp", "p10_gbp", "p25_gbp", "cheap3_gbp",
+                    "median_gbp", "source_price_now_gbp", "source_ref_gbp",
+                    "first_markdown_ts"])
+    n_ok = 0
+    for c in cands:
+        q, region = c["product_key"], c["region"] or "GB"
+        import hashlib
+        mkt = C.MARKETPLACE.get(region, "EBAY_US")
+        key = hashlib.sha1(f"v2|{mkt}|{q}|50".encode()).hexdigest()
+        conn.execute("DELETE FROM comps WHERE key=?", (key,))
+        raw = ec.lookup(q, region=region, limit=50)
+        if not raw or not raw.get("items"):
+            continue
+        kept = sorted(it["p"] for it in raw["items"]
+                      if I.title_matches(q, it["t"])[0])
+        if not kept:
+            continue
+        fx = (rates.get(raw["currency"]) or 1.0) / gbp
+        kg = [p / fx for p in kept]
+        def pct(p):
+            k = (len(kg) - 1) * p
+            lo, hi = int(k), min(int(k) + 1, len(kg) - 1)
+            return kg[lo] + (kg[hi] - kg[lo]) * (k - lo)
+        import statistics as st
+        src_now = first_md = None
+        if c["sku"]:
+            r = conn.execute(
+                "SELECT price, currency FROM obs WHERE ts=? AND sku=? AND domain=?",
+                (cur, c["sku"], c["domain"])).fetchone()
+            if r:
+                src_now = (r["price"] / (rates.get(r["currency"]) or 1.0)) * gbp
+            r2 = conn.execute(
+                "SELECT MIN(ts) FROM obs WHERE sku=? AND domain=? AND "
+                "compare IS NOT NULL AND compare > price",
+                (c["sku"], c["domain"])).fetchone()
+            first_md = r2[0] if r2 else None
+        w.writerow([ts, q, region, len(kg), len(raw["items"]),
+                    f"{kg[0]:.2f}", f"{pct(.10):.2f}", f"{pct(.25):.2f}",
+                    f"{st.median(kg[:3]):.2f}", f"{st.median(kg):.2f}",
+                    f"{src_now:.2f}" if src_now else "",
+                    f"{c['list_gbp']:.2f}" if c["list_gbp"] else "",
+                    first_md or ""])
+        n_ok += 1
+        time.sleep(0.3)
+    f.close()
+    print(f"comp-track: {n_ok}/{len(cands)} candidates recorded at {ts} "
+          f"(api calls={ec.calls})")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -512,6 +588,8 @@ def main():
     g.set_defaults(fn=cmd_ingest)
     lb = sub.add_parser("labels")
     lb.set_defaults(fn=cmd_labels)
+    rc = sub.add_parser("recomp")
+    rc.set_defaults(fn=cmd_recomp)
     ex = sub.add_parser("export")
     ex.set_defaults(fn=cmd_export)
     rb = sub.add_parser("rebuild")
