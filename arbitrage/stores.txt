@@ -59,3 +59,17 @@ shopify   thinkcrucial.com              USD  US  fitment
 shopify   kenu.com                      USD  US  fitment
 shopify   nitecorestore.com             USD  US  fitment
 shopify   fenix-store.com               USD  US  fitment
+
+# clearance-behaviour cohort -- selected by measured markdown depth + outlet sections
+shopify   cotopaxi.com                  USD  US  clearance
+shopify   ember.com                     USD  US  clearance
+shopify   wandp.com                     USD  US  clearance
+shopify   klymit.com                    USD  US  clearance
+shopify   hexclad.com                   USD  US  clearance
+shopify   skullcandy.com                USD  US  clearance
+shopify   jlab.com                      USD  US  clearance
+shopify   rumpl.com                     USD  US  clearance
+shopify   thehouseofmarley.com          USD  US  clearance
+shopify   umbra.com                     USD  US  clearance
+shopify   misen.com                     USD  US  clearance
+shopify   case-mate.com                 USD  US  clearance
