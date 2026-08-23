@@ -1,5 +1,5 @@
 cohort,product,outcome_class,realised_sold_gbp,evidence,target_retail_available,notes
-1,Stanley IceFlow Tumbler 20oz,identity_fail,28.7,"sold comps all 40oz at GBP38.73; 20oz market unproven",unknown,"size-variant trap; 40oz like-for-like negative (supply $45 full price)"
+1,Stanley IceFlow Tumbler 20oz,identity_fail,38.73,"sold comps all 40oz at GBP38.73; 20oz market unproven",unknown,"size-variant trap; 40oz like-for-like negative (supply $45 full price)"
 1,Brooklinen Heathered Cashmere King,promising,60.0,"1 sold $81.18 King new; another listing $69; pre-owned Standard $24",no,"size drives price (24-81 spread); advisor: most interesting of six"
 1,Ridge Daily Driver Lavender,price_fail,55.5,"exact Lavender kit sold $75; second listing ended unsold at $95",unknown,"buy 65.17 cannot clear fees at realised 55"
 1,Brooklinen Classic Percale Std,price_fail,20.0,"repeated sales: 3 sold $25 + 4 sold $29.99",no,"real demand; buy 10.80 leaves GBP2-4 after fees; ask median was bundle-polluted"
