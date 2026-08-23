@@ -98,7 +98,7 @@ class EbayComp:
         `median` is an ASKING price, not a realised sale price.
         """
         mkt = MARKETPLACE.get(region, "EBAY_US")
-        key = hashlib.sha1(f"v2|{mkt}|{query}|{limit}".encode()).hexdigest()
+        key = hashlib.sha1(f"v3|{mkt}|{query}|{limit}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
         if row and time.time() - row[0] < COMP_TTL:
@@ -139,7 +139,8 @@ class EbayComp:
             p = (it.get("price") or {})
             try:
                 items.append({"t": it.get("title") or "",
-                              "p": float(p["value"])})
+                              "p": float(p["value"]),
+                              "id": it.get("itemId")})
                 cur = cur or p.get("currency")
             except (KeyError, TypeError, ValueError):
                 continue
@@ -150,7 +151,8 @@ class EbayComp:
                 "p25": prices[max(0, len(prices) // 4 - 1)],
                 "n": int(d.get("total", len(prices))),
                 "currency": cur or "USD", "synthetic": False,
-                "items": items}
+                "items": items,
+                "ids": [i["id"] for i in items if i.get("id")]}
 
     @staticmethod
     def _synthetic(query, mkt):
