@@ -67,3 +67,27 @@ both winners retained.
 2. Funnel: add R1 (premium vs list) + R2 (n≥3) as shortlist gates and
    surface R3 as a required manual check where no UK feed exists.
 3. Then resume cohorts at scale.
+
+## Cohort 5 holdout result (2026-08-23, labels complete — freeze lifted)
+
+Verified viable: **0 of 5 reviewed, 0 of 85 comped.**
+
+| | Old funnel | Frozen-gate funnel |
+|---|---|---|
+| human reviews | 5 | 2 |
+| verified viable | 0 | 0 |
+| precision | 0/5 | 0/2 |
+| opportunity recall | n/a (no positives existed) | n/a |
+
+Gates saved 60% of reviews and lost nothing, but both gated rows failed:
+Norm Bifold price_fail (the pre-flagged warning, confirmed — R1 fired on
+an inflated ask median), Capers identity_fail (SIX unanimous
+"clean" comps were the wrong product: non-distinctive model names defeat
+token-based identity, so R2's support count can be confidently wrong).
+
+Out-of-sample verdict: the dislocation signal, as currently computed from
+filtered active asks, did NOT generalise. Its numerator is the problem —
+consistent with the calibration finding that active asks cannot yet be
+trusted as realised-price proxies. Per the pre-registered plan, the next
+investigation is a scalable sold-evidence source, not further Browse
+valuation tuning.

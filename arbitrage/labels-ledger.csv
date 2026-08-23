@@ -34,3 +34,8 @@ cohort,product,outcome_class,realised_sold_gbp,evidence,target_retail_available,
 4,Cotopaxi Todo 3L Bucket,price_fail,,,unknown,"same"
 4,Cotopaxi Coraje Cargo Pant,price_fail,,,unknown,"same"
 4,Rightline Gear Sport Jr,price_fail,,,unknown,"same"
+5,Distil Union Norm Bifold,price_fail,,"sold market below GBP132 filtered ask (n=3); Norm warning confirmed",unknown,"GATED row; R1 fired on bad valuation"
+5,Chrome Industries Mini Kadet Sling,price_fail,,"identity correct, sold too low",unknown,"ungated (n=2)"
+5,Distil Union Ashley Sunglasses,identity_fail,,"wrong product in sold results",unknown,"n=1"
+5,Distil Union Capers Sunglasses,identity_fail,,"n=6 unanimous clean comps were WRONG product",unknown,"GATED row; non-distinctive model name defeats token identity"
+5,Distil Union Kiawah Sunglasses,identity_fail,,"wrong product",unknown,"n=1"
