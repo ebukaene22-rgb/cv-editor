@@ -1,0 +1,19 @@
+product,verdict,known_sold,raw_rows,matched_rows,their_median_all,our_median_matched,p25,newest,epid_cov
+TS SuitCase 16,REAL,31.15,40,1,14.27,30.35,30.35,2026-06-28,0
+Cashmere King,promising,60.0,40,2,38.50,52.00,39.00,2026-07-05,0
+Classic Percale Std,price_fail,20.0,43,13,42.95,36.00,31.99,2026-08-18,1
+Eddy Cardigan,price_fail,51.8,40,23,85.00,85.00,69.00,2026-08-22,0
+W Dasher NZ,price_fail,58.6,40,19,42.98,40.00,27.00,2026-08-20,0
+M Dasher NZ,price_fail,58.6,41,32,43.00,40.00,40.00,2026-08-22,0
+Ridge Daily Driver,price_fail,55.5,44,31,197.22,212.43,125.00,2026-08-19,23
+Satechi 100W GaN,price_fail,49.7,41,11,29.99,29.99,14.99,2026-08-22,1
+IceFlow 40oz,identity_fail,38.73,40,4,21.86,32.24,25.65,2026-08-17,0
+Basecamp 4,price_fail,59.0,40,0,47.80,,,-,0
+Fellow Carter lid,bundle_fail,32.5,41,0,35.99,,,-,0
+Beechwood Spatulas,price_fail,13.0,41,2,43.97,79.53,69.08,2026-06-21,0
+PD Loop 15 Pro Max,price_fail,13.5,44,7,6.44,17.22,3.96,2026-08-13,0
+Norm Bifold,price_fail,,21,5,49.00,58.99,50.00,2026-08-15,0
+Capers Sunglasses,identity_fail,,34,1,49.99,69.99,69.99,2026-05-29,0
+Chrome Mini Kadet,price_fail,,45,41,62.30,55.00,41.04,2026-08-23,2
+ActionSleeve,hold,,41,4,43.66,16.99,3.66,2026-08-06,0
+Skullcandy Icon ANC,hold,,44,6,53.99,50.49,42.30,2026-08-22,2
