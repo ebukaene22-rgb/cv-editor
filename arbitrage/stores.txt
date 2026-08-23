@@ -73,3 +73,14 @@ shopify   thehouseofmarley.com          USD  US  clearance
 shopify   umbra.com                     USD  US  clearance
 shopify   misen.com                     USD  US  clearance
 shopify   case-mate.com                 USD  US  clearance
+
+# cohort 5 -- HOLDOUT universe for frozen-gate out-of-sample test (2026-08-23)
+shopify   corkcicle.com                 USD  US  holdout
+shopify   ugmonk.com                    USD  US  holdout
+shopify   status.co                     USD  US  holdout
+shopify   chromeindustries.com          USD  US  holdout
+shopify   hypershop.com                 USD  US  holdout
+shopify   moft.us                       USD  US  holdout
+shopify   materialkitchen.com           USD  US  holdout
+shopify   distilunion.com               USD  US  holdout
+shopify   shopbala.com                  USD  US  holdout

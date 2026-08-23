@@ -1,8 +1,11 @@
 # Label post-mortem — cohorts 1–4 (2026-08-23)
 
 35 outcome-classified candidates (`labels-ledger.csv`), 32 human-reviewed,
-14 with verified realised prices. Winners: 1 confirmed (Twelve South
-SuitCase 16"), 1 promising (Brooklinen Heathered Cashmere King).
+14 with verified realised prices. Positives: 2 HUMAN-VERIFIED TRADES (Twelve South SuitCase 16",
+Brooklinen Heathered Cashmere King) -- note the ladder:
+scanner survivor -> human-verified trade -> realised profitable trade.
+Nothing has yet reached the third rung; no candidate is a realised
+winner until an actual transaction completes.
 
 ## Outcome taxonomy
 price_fail 18 · identity_fail 5 · condition_fail 2 · bundle_fail 1 ·
@@ -16,13 +19,21 @@ economics of the market itself.
 Winners at 50%/60% source discount; fails median 50%, range 12–75%.
 Deep markdown is where candidates come from, not what makes them win.
 
-## H2: dislocation separates almost perfectly
+## H2: dislocation separates on this sample (HYPOTHESIS, not confirmation)
 Test: realised sold price ABOVE the product's own original list price.
 - Both winners: ABOVE (SuitCase £31.15 vs £14.64 list; Cashmere £60 vs £58)
 - 13 of 14 fails: below. The exception (Basecamp 4, +0.9%) dies with a
-  5% margin: **realised > 1.05 × list** separates perfectly on this sample.
+  5% margin: **realised > 1.05 × source reference price** separates
+  perfectly here. CAUTION: with 2 positives and 14 priced failures,
+  perfect separation is achievable by chance when multiple candidate
+  rules are examined. This is the hypothesis cohort 5 exists to test
+  out-of-sample, not a validated rule.
 
-Interpretation: the winning products are ones whose resale price never
+Terminology: "list" here is Shopify compare_at_price -- the SOURCE
+REFERENCE PRICE, which may be an old promo anchor, regional price, or
+whatever the merchant populated. It is not a verified market MSRP.
+
+Interpretation: the two current positives are products whose resale price never
 depended on the storefront's pricing — the source collapsed while the
 resale market didn't reprice. Exactly the advisor's Relative Price
 Dislocation formulation. Caveat: n=2 winners; this is a candidate prior,
