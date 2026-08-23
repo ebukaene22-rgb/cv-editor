@@ -49,3 +49,13 @@ shopify   twelvesouth.co.uk             GBP  GB  hardgoods
 shopify   satechi.co.uk                 GBP  GB  hardgoods
 shopify   goalzero.co.uk                GBP  GB  hardgoods
 shopify   brumate.co.uk                 GBP  GB  hardgoods
+
+# fitment/compatibility cohort -- mounts, auto care, replacement parts, torches
+shopify   quadlockcase.com              USD  US  fitment
+shopify   rokform.com                   USD  US  fitment
+shopify   adamspolishes.com             USD  US  fitment
+shopify   chemicalguys.com              USD  US  fitment
+shopify   thinkcrucial.com              USD  US  fitment
+shopify   kenu.com                      USD  US  fitment
+shopify   nitecorestore.com             USD  US  fitment
+shopify   fenix-store.com               USD  US  fitment
