@@ -507,6 +507,31 @@ def cmd_mpn_economics(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_mpn_source_audit(args):
+    """Test the frozen MPN demand set against a structured secondary source."""
+    import comp as C
+    import mpn as M
+    conn = db()
+    ebay = C.EbayComp(conn)
+    if ebay.synthetic:
+        sys.exit("mpn-source-audit requires eBay credentials")
+    rate = args.usd_to_gbp or fx_rates(conn).get("GBP")
+    if not rate:
+        sys.exit("USD-to-GBP rate unavailable; pass --usd-to-gbp")
+    totals = M.run_used_source_audit(
+        ebay, args.resolution, args.out, rate, region=args.ebay_region,
+        min_market_listings=args.min_market_listings, timeout=args.timeout)
+    verdict = "ADVANCE_FULL_ECONOMICS" if totals["source_gate_passed"] else "KILL_SOURCE"
+    print(f"frozen demand: {totals['demand_rows']} identities; exact source matches: "
+          f"{totals['matched_identities']}; available identities: "
+          f"{totals['available_identities']}")
+    print(f"available condition variants: {totals['available_variants']}; "
+          f"usable condition markets: {totals['condition_markets']}; "
+          f"pre-cost candidates: {totals['pre_cost_candidates']}")
+    print(f"three-SKU source gate: {verdict}")
+    print(f"evidence -> {args.out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -763,6 +788,15 @@ def main():
     me.add_argument("--out", default="experiments/mpn-economics-ledger.csv")
     me.add_argument("--usd-to-gbp", type=float)
     me.set_defaults(fn=cmd_mpn_economics)
+    ms = sub.add_parser("mpn-source-audit")
+    ms.add_argument("--resolution",
+                    default="experiments/mpn-resolution-ledger.csv.gz")
+    ms.add_argument("--out", default="experiments/mpn-used-source-ledger.csv")
+    ms.add_argument("--ebay-region", default="US")
+    ms.add_argument("--min-market-listings", type=int, default=3)
+    ms.add_argument("--usd-to-gbp", type=float)
+    ms.add_argument("--timeout", type=int, default=20)
+    ms.set_defaults(fn=cmd_mpn_source_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

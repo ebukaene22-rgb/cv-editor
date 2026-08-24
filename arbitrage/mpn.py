@@ -7,6 +7,7 @@ import math
 import re
 import statistics
 import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
@@ -42,6 +43,27 @@ ECONOMICS_FIELDS = [
 ]
 
 MIN_NET_CONTRIBUTION_GBP = 15.0
+
+USED_SOURCE_FIELDS = [
+    "brand", "mpn", "source_category", "source_vendor", "brand_match_rule",
+    "source_condition", "condition_family", "source_price_usd",
+    "source_available", "source_sku", "source_url", "source_verified_at",
+    "market_status", "market_depth", "market_p25_usd", "currency",
+    "gross_spread_pre_cost_usd", "gross_spread_pre_cost_gbp",
+    "economics_status", "unresolved_inputs",
+]
+
+BRAND_FAMILIES = {
+    "electrolux": {"electrolux", "frigidaire"},
+    "whirlpool": {"whirlpool", "maytag"},
+}
+
+SOURCE_CONDITIONS = {
+    "New": "new",
+    "Like New / Open Box": "open_box",
+    "Certified Refurbished": "certified_refurbished",
+    "Used Part - A Condition Grade": "used",
+}
 
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
@@ -293,4 +315,129 @@ def run_economics_gate(source_path, resolution_path, out_path, usd_to_gbp):
         "tool_cleared": sum(not row["economics_status"].startswith(
             "REJECT") for row in tool),
         "precheck_passed": len(output) - rejected >= 4,
+    }
+
+
+def _canonical_text(value):
+    return "".join(ch for ch in str(value or "").casefold()
+                   if ch.isalnum())
+
+
+def source_brand_match(demand_brand, source_vendor):
+    demand = _canonical_text(demand_brand)
+    source = _canonical_text(source_vendor)
+    if demand == "generalelectric":
+        demand = "ge"
+    if source == "generalelectric":
+        source = "ge"
+    if demand == source:
+        return "EXACT_BRAND"
+    if any(demand in family and source in family
+           for family in BRAND_FAMILIES.values()):
+        return "CORPORATE_BRAND_FAMILY"
+    return ""
+
+
+def _source_part_number(body):
+    match = re.search(r"Part Number:</strong>\s*([^<]+)", body or "", re.I)
+    return match.group(1).strip() if match else ""
+
+
+def _source_products(mpn, timeout=20):
+    query = urllib.parse.urlencode({
+        "q": mpn, "resources[type]": "product", "resources[limit]": "10",
+    })
+    url = "https://neuapplianceparts.com/search/suggest.json?" + query
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return (json.load(response).get("resources", {}).get("results", {})
+                .get("products", []))
+
+
+def _source_product_detail(handle, timeout=20):
+    url = f"https://neuapplianceparts.com/products/{handle}.js"
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def run_used_source_audit(ebay, resolution_path, out_path, usd_to_gbp,
+                          region="US", min_market_listings=3, timeout=20):
+    """Test a structured used/open-box source against condition-matched comps."""
+    if usd_to_gbp <= 0:
+        raise ValueError("USD-to-GBP rate must be positive")
+    demand = [row for row in _read_csv(resolution_path)
+              if row.get("usable_market") == "1"]
+    verified_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    output = []
+    matched_identities = set()
+    available_identities = set()
+    for row in demand:
+        expected_mpn = _canonical_text(row["mpn"])
+        for product in _source_products(row["mpn"], timeout):
+            if _canonical_text(_source_part_number(product.get("body"))) != expected_mpn:
+                continue
+            brand_rule = source_brand_match(row["brand"], product.get("vendor"))
+            if not brand_rule:
+                continue
+            matched_identities.add((row["brand"], row["mpn"]))
+            detail = _source_product_detail(product["handle"], timeout)
+            for variant in detail.get("variants", []):
+                condition = SOURCE_CONDITIONS.get(variant.get("title"))
+                if not condition or not variant.get("available"):
+                    continue
+                available_identities.add((row["brand"], row["mpn"]))
+                price = float(variant["price"]) / 100
+                market = ebay.lookup_mpn(
+                    row["brand"], row["mpn"], region=region, limit=20,
+                    detail_limit=20, min_market_listings=min_market_listings,
+                    condition=condition) or {"resolution_status": "API_ERROR"}
+                p25 = market.get("p25")
+                spread_usd = p25 - price if p25 is not None else None
+                spread_gbp = (spread_usd * usd_to_gbp
+                              if spread_usd is not None else None)
+                if not market.get("usable_market"):
+                    status = "REJECT_CONDITION_MARKET_DEPTH"
+                elif spread_gbp < MIN_NET_CONTRIBUTION_GBP:
+                    status = "REJECT_PRE_COST_SPREAD_BELOW_15_GBP"
+                else:
+                    status = "BLOCKED_FULL_ECONOMICS_REQUIRED"
+                output.append({
+                    "brand": row["brand"], "mpn": row["mpn"],
+                    "source_category": row["source_category"],
+                    "source_vendor": product.get("vendor") or "",
+                    "brand_match_rule": brand_rule,
+                    "source_condition": variant.get("title") or "",
+                    "condition_family": condition,
+                    "source_price_usd": f"{price:.2f}",
+                    "source_available": "1", "source_sku": variant.get("sku") or "",
+                    "source_url": ("https://neuapplianceparts.com/products/" +
+                                   product["handle"]),
+                    "source_verified_at": verified_at,
+                    "market_status": market.get("resolution_status", "API_ERROR"),
+                    "market_depth": market.get("coherent_depth", 0),
+                    "market_p25_usd": f"{p25:.2f}" if p25 is not None else "",
+                    "currency": market.get("currency") or "",
+                    "gross_spread_pre_cost_usd": (
+                        f"{spread_usd:.2f}" if spread_usd is not None else ""),
+                    "gross_spread_pre_cost_gbp": (
+                        f"{spread_gbp:.2f}" if spread_gbp is not None else ""),
+                    "economics_status": status,
+                    "unresolved_inputs": (
+                        "source_shipping_quote;outbound_postage;ebay_fee;"
+                        "return_allowance;sold_velocity"),
+                })
+    with open(out_path, "w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=USED_SOURCE_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    viable = sum(row["economics_status"] ==
+                 "BLOCKED_FULL_ECONOMICS_REQUIRED" for row in output)
+    return {
+        "demand_rows": len(demand), "matched_identities": len(matched_identities),
+        "available_identities": len(available_identities),
+        "available_variants": len(output), "condition_markets": sum(
+            row["market_status"] == "EXACT_USABLE" for row in output),
+        "pre_cost_candidates": viable, "source_gate_passed": viable >= 3,
     }

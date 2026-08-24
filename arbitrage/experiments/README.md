@@ -78,6 +78,17 @@ closed for this cohort. Regenerate the machine-readable decision with:
 python3 scan.py mpn-economics
 ```
 
+Test the same frozen exact-MPN demand universe against the structured Neu
+Appliance Parts used/open-box catalogue. eBay credentials are required because
+every available source variant is resolved against the matching condition:
+
+```bash
+python3 scan.py mpn-source-audit
+```
+
+Outputs `mpn-used-source-ledger.csv`; methodology and the frozen result are in
+`MPN-USED-SOURCE-GATE.md`.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

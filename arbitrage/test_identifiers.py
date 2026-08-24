@@ -167,6 +167,24 @@ class IdentifierTests(unittest.TestCase):
         self.assertFalse(result["usable_market"])
         self.assertEqual(result["median"], 20)
 
+    def test_mpn_condition_families_are_strict(self):
+        self.assertTrue(comp.EbayComp._condition_matches(
+            "New - Open box", "open_box"))
+        self.assertTrue(comp.EbayComp._condition_matches(
+            "Certified - Refurbished", "certified_refurbished"))
+        self.assertFalse(comp.EbayComp._condition_matches(
+            "Seller refurbished", "certified_refurbished"))
+        self.assertFalse(comp.EbayComp._condition_matches("New", "open_box"))
+
+    def test_source_brand_matching_uses_only_approved_families(self):
+        self.assertEqual(MPN.source_brand_match("Frigidaire", "Electrolux"),
+                         "CORPORATE_BRAND_FAMILY")
+        self.assertEqual(MPN.source_brand_match("Whirlpool", "Maytag"),
+                         "CORPORATE_BRAND_FAMILY")
+        self.assertEqual(MPN.source_brand_match("General Electric", "GE"),
+                         "EXACT_BRAND")
+        self.assertEqual(MPN.source_brand_match("DeWalt", "Black & Decker"), "")
+
     def test_mpn_basket_parser_uses_structured_url_suffix(self):
         row = MPN._parse_candidate(
             "https://www.ereplacementparts.com/parts/dishwasher/"
