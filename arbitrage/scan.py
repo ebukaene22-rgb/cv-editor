@@ -407,6 +407,51 @@ def cmd_labels(args):
     RV.report(conn)
 
 
+def cmd_measure(args):
+    """Write calendar-normalised scarcity measurements and the event review gate."""
+    import experiments as E
+    conn = db()
+    totals = E.write_measurement(conn, args.out, args.review_out, args.review_n)
+    print(f"measurement: {totals['rows']:,} active SKU histories -> {args.out}")
+    print(f"scarcity review: {totals['review_rows']} rows -> {args.review_out}")
+    print(f"SKU-days: {totals['sku_days']:,.1f}")
+    for name in ("stockouts", "restocks", "cycles"):
+        rate = totals[name + "_per_10k_sku_days"]
+        print(f"{name}: {totals[name]:,} ({rate:.2f} per 10k SKU-days)")
+
+
+def cmd_openbox_cohort(args):
+    """Generate the bounded condition-matched open-box/refurb review sheet."""
+    import experiments as E
+    conn = db()
+    n = E.write_openbox_cohort(conn, fx_rates(conn), args.out, args.n)
+    print(f"open-box/refurb cohort: {n}/{args.n} rows -> {args.out}")
+
+
+def cmd_bundle_cohort(args):
+    """Generate bundle candidates with explicit component-mapping fields."""
+    import experiments as E
+    conn = db()
+    n = E.write_bundle_cohort(conn, fx_rates(conn), args.out, args.n)
+    print(f"bundle cohort: {n}/{args.n} rows -> {args.out}")
+
+
+def cmd_liquidation_template(args):
+    """Create the input contract for one manifested-lot paper exercise."""
+    import experiments as E
+    E.write_liquidation_template(args.out)
+    print(f"liquidation manifest template -> {args.out}")
+
+
+def cmd_liquidation(args):
+    """Conservatively underwrite a filled liquidation manifest."""
+    import experiments as E
+    result = E.underwrite_liquidation(
+        args.file, args.bid, args.freight, args.testing, args.disposal,
+        args.fee_rate)
+    E.print_underwriting(result)
+
+
 
 def cmd_export(args):
     """Export snapshots to history/*.csv.gz -- the git-friendly archive."""
@@ -588,6 +633,30 @@ def main():
     g.set_defaults(fn=cmd_ingest)
     lb = sub.add_parser("labels")
     lb.set_defaults(fn=cmd_labels)
+    m = sub.add_parser("measure")
+    m.add_argument("--out", default="experiments/scarcity-measurement.csv.gz")
+    m.add_argument("--review-out", default="experiments/scarcity-review.csv")
+    m.add_argument("--review-n", type=int, default=20)
+    m.set_defaults(fn=cmd_measure)
+    ob = sub.add_parser("openbox-cohort")
+    ob.add_argument("-n", type=int, default=30)
+    ob.add_argument("--out", default="experiments/openbox-cohort.csv")
+    ob.set_defaults(fn=cmd_openbox_cohort)
+    bu = sub.add_parser("bundle-cohort")
+    bu.add_argument("-n", type=int, default=20)
+    bu.add_argument("--out", default="experiments/bundle-cohort.csv")
+    bu.set_defaults(fn=cmd_bundle_cohort)
+    lt = sub.add_parser("liquidation-template")
+    lt.add_argument("--out", default="experiments/liquidation-manifest.csv")
+    lt.set_defaults(fn=cmd_liquidation_template)
+    lu = sub.add_parser("liquidation")
+    lu.add_argument("file")
+    lu.add_argument("--bid", type=float, required=True)
+    lu.add_argument("--freight", type=float, required=True)
+    lu.add_argument("--testing", type=float, default=0.0)
+    lu.add_argument("--disposal", type=float, default=0.0)
+    lu.add_argument("--fee-rate", type=float, default=0.15)
+    lu.set_defaults(fn=cmd_liquidation)
     rc = sub.add_parser("recomp")
     rc.set_defaults(fn=cmd_recomp)
     ex = sub.add_parser("export")

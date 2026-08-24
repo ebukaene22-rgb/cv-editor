@@ -29,7 +29,7 @@ Confounders explicitly controlled for:
 Everything here degrades honestly: with one snapshot there is no signal, and
 the code says so rather than returning zero.
 """
-from collections import defaultdict
+from datetime import datetime
 
 # If more than this fraction of a store's SKUs flip in one snapshot, treat
 # that snapshot's transitions for that store as an artefact.
@@ -84,19 +84,48 @@ def depletion_signals(conn, domain):
     artefacts = mass_flip_snapshots(conn, domain)
     last_ts = snaps[-1]
 
-    series = defaultdict(list)
-    for ts, sku, avail in conn.execute(
-            "SELECT ts, sku, available FROM obs WHERE domain=? ORDER BY ts",
-            (domain,)):
-        series[sku].append((ts, avail))
+    frames = {ts: {} for ts in snaps}
+    for ts, sku, avail, price in conn.execute(
+            "SELECT ts, sku, available, price FROM obs "
+            "WHERE domain=? ORDER BY ts", (domain,)):
+        frames[ts][sku] = (avail, price)
+
+    def elapsed_days(t0, t1):
+        a = datetime.fromisoformat(t0.replace("Z", "+00:00"))
+        b = datetime.fromisoformat(t1.replace("Z", "+00:00"))
+        return max(0.0, (b - a).total_seconds() / 86400.0)
 
     out = {}
-    for sku, seq in series.items():
+    all_skus = set().union(*(set(frame) for frame in frames.values()))
+    for sku in all_skus:
+        seq = [(ts, *frames[ts][sku]) for ts in snaps if sku in frames[ts]]
         stockouts = restocks = cycles = 0
+        valid_intervals = price_changes = 0
+        sku_days = in_stock_days = out_of_stock_days = 0.0
         armed = False          # saw a restock, waiting for the next depletion
-        for (t0, a0), (t1, a1) in zip(seq, seq[1:]):
+        for t0, t1 in zip(snaps, snaps[1:]):
+            before, after = frames[t0].get(sku), frames[t1].get(sku)
+            if before is None or after is None:
+                # A missing catalogue row is unknown, not a continuous state.
+                # Never bridge a transition across that observation gap.
+                armed = False
+                continue
             if t1 in artefacts:
+                armed = False
                 continue       # store-wide event: not demand
+            a0, p0 = before
+            a1, p1 = after
+            days = elapsed_days(t0, t1)
+            if days <= 0:
+                continue
+            valid_intervals += 1
+            sku_days += days
+            if a0:
+                in_stock_days += days
+            else:
+                out_of_stock_days += days
+            if p0 is not None and p1 is not None and p0 != p1:
+                price_changes += 1
             if a0 == 1 and a1 == 0:
                 stockouts += 1
                 if armed:
@@ -106,9 +135,14 @@ def depletion_signals(conn, domain):
                 restocks += 1
                 armed = True
         n = len(seq)
-        intervals = max(1, n - 1)
+        intervals = max(1, valid_intervals)
         delisted = seq[-1][0] != last_ts
-        oos = sum(1 for _, a in seq if a == 0) / n
+        oos = (out_of_stock_days / sku_days if sku_days else
+               sum(1 for _, a, _ in seq if a == 0) / n)
+        observed_prices = [p for _, _, p in seq if p is not None and p > 0]
+        price_stability = None
+        if observed_prices:
+            price_stability = min(observed_prices) / max(observed_prices)
 
         if delisted or n < 2:
             conf = "none"
@@ -123,7 +157,16 @@ def depletion_signals(conn, domain):
 
         out[sku] = {"n_obs": n, "stockouts": stockouts, "restocks": restocks,
                     "cycles": cycles, "oos_frac": oos, "delisted": delisted,
-                    "intensity": cycles / intervals, "confidence": conf}
+                    "intensity": cycles / intervals, "confidence": conf,
+                    "first_seen": seq[0][0], "last_seen": seq[-1][0],
+                    "sku_days": sku_days, "in_stock_days": in_stock_days,
+                    "out_of_stock_days": out_of_stock_days,
+                    "valid_intervals": valid_intervals,
+                    "coverage": valid_intervals / max(1, len(snaps) - 1),
+                    "price_changes": price_changes,
+                    "price_stability": price_stability,
+                    "cycles_per_30d": (cycles / sku_days * 30.0
+                                       if sku_days else None)}
     return out
 
 
@@ -144,7 +187,9 @@ def expected_monthly_orders(sig, share_of_market=0.15, snapshots_per_day=1.0):
     """
     if not sig or sig["confidence"] in ("none",):
         return None
-    days = max(1.0, sig["n_obs"] / max(snapshots_per_day, 1e-6))
+    days = sig.get("sku_days")
+    if not days:
+        days = max(1.0, sig["n_obs"] / max(snapshots_per_day, 1e-6))
     # Each completed cycle = at least one replenished batch depleted.
     cycles_per_day = sig["cycles"] / days
     if cycles_per_day <= 0:
