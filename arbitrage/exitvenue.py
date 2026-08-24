@@ -33,8 +33,10 @@ title. Categories, not keywords.
 
 ## Six outcomes: name morphology is not identity
 
-    confirmed_active   handle with listings AND independent evidence the
-                       seller IS the source (storelink.py)
+    confirmed_active   handle with listings AND CONFIRMING identity evidence
+                       -- a company-registration or VAT match from
+                       getItem sellerLegalInfo (legalid.py), or the source's
+                       own site linking the handle (storelink.py)
     candidate_active   plausible handle with listings, identity unestablished
     rejected_reseller  name matched only by containment -- an independent
                        reseller trading on the brand name
@@ -112,9 +114,25 @@ import urllib.request
 
 from arbitrage import selfcomp
 from arbitrage import storelink
+from arbitrage import legalid
 
 OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+BROWSE_ITEM = "https://api.ebay.com/buy/browse/v1/item/"
+
+# Legal identifiers a source publishes on its own terms pages, harvested at
+# zero eBay cost. A getItem sellerLegalInfo match against these is the
+# strongest automated attribution available -- see legalid.py.
+SOURCE_LEGAL = {
+    "www.itinstock.com":   {"registrationNumber": "12704142",
+                            "vat": "GB483890250", "name": "IT In Stock Ltd"},
+    "www.tier1online.com": {"registrationNumber": "03708416",
+                            "name": "Tier 1 Online"},
+}
+
+# sellerLegalInfo fields are conditional, so one bare item is not an absent
+# field. Sample this many listings before reporting legal_info_unavailable.
+LEGAL_SAMPLE = 5
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 MARKETPLACE = {"US": "EBAY_US", "GB": "EBAY_GB", "EU": "EBAY_DE",
                "CA": "EBAY_CA", "AU": "EBAY_AU"}
@@ -196,7 +214,10 @@ class Browse:
         return self._tok
 
     def search(self, params, mkt, retries=3):
-        url = BROWSE + "?" + urllib.parse.urlencode(params)
+        return self.search_url(BROWSE + "?" + urllib.parse.urlencode(params),
+                               mkt, retries)
+
+    def search_url(self, url, mkt, retries=3):
         for attempt in range(retries):
             req = urllib.request.Request(url, headers={
                 "Authorization": f"Bearer {self.token()}",
@@ -219,6 +240,29 @@ class Browse:
         return {"_error": "retries exhausted"}
 
 
+def get_item(api, item_id, mkt):
+    """Detailed item resource -- the only place sellerLegalInfo appears."""
+    url = BROWSE_ITEM + urllib.parse.quote(str(item_id), safe="")
+    return api.search_url(url, mkt)
+
+
+def sample_legal(api, handle, mkt, item_ids):
+    """
+    -> [legalid.extract(...)] over several listings.
+
+    Several, not one: the fields are conditional and a single item lacking
+    the block is not the block being unavailable.
+    """
+    out = []
+    for iid in item_ids[:LEGAL_SAMPLE]:
+        d = get_item(api, iid, mkt)
+        if "_error" in d:
+            continue
+        out.append(legalid.extract(d))
+        time.sleep(0.1)
+    return out
+
+
 def seller_probe(api, handle, cat, mkt, limit=50):
     """
     One category, one seller. -> (state, total, titles)
@@ -239,7 +283,8 @@ def seller_probe(api, handle, cat, mkt, limit=50):
                for i in items}
     if sellers != {handle.lower()}:
         return "dropped", None, []
-    return "honoured", total, [i.get("title") or "" for i in items]
+    return "honoured", total, [{"title": i.get("title") or "",
+                                "id": i.get("itemId")} for i in items]
 
 
 def probe_domain(api, domain, region, verbose=True, confirm=True):
@@ -288,6 +333,7 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
 
     # --- 3. inventory + brand attribution for each real handle ------------
     total_listings, attributed, where, sample = 0, False, [], ""
+    item_ids = []
     probes = [(h, c, lbl) for h in real for c, lbl in INVENTORY_CATS]
     with futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
         jobs = {pool.submit(seller_probe, api, h, c, mkt): (h, lbl)
@@ -301,10 +347,12 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
                 continue
             total_listings += n
             where.append(f"{label}:{n}")
+            item_ids.extend(t["id"] for t in titles if t.get("id"))
             for t in titles:
-                if any(term in t.lower() for term in terms):
+                title = t.get("title") or ""
+                if any(term in title.lower() for term in terms):
                     attributed = True
-                    sample = sample or t[:90]
+                    sample = sample or title[:90]
                     break
     where.sort()
 
@@ -315,16 +363,28 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
     elif not real:
         row["present"] = ("rejected_reseller" if rejected else "not_detected")
     elif total_listings > 0:
-        confirmed = ""
+        confirmed, tier, why = "", None, ""
         if confirm:
-            linked, _, _ = storelink.brand_ebay_handles(domain)
-            for h in real:
-                ok, why = storelink.confirms(domain, h, linked=linked)
-                if ok:
-                    confirmed = why
-                    break
+            # Route two first: a registration/VAT match is the strongest
+            # automated attribution, and route one measured nearly empty.
+            expected = SOURCE_LEGAL.get(domain)
+            if expected and item_ids:
+                obs = sample_legal(api, real[0], mkt, item_ids)
+                tier, why = legalid.best_of(obs, expected)
+                if legalid.is_confirming(tier):
+                    confirmed = f"{tier}: {why}"
+            if not confirmed:
+                linked, _, _ = storelink.brand_ebay_handles(domain)
+                for h in real:
+                    ok, lwhy = storelink.confirms(domain, h, linked=linked)
+                    if ok:
+                        confirmed, tier = lwhy, "site_link"
+                        break
         row["present"] = "confirmed_active" if confirmed else "candidate_active"
-        row["identity_evidence"] = confirmed
+        # a non-confirming tier is still evidence worth carrying
+        row["identity_evidence"] = confirmed or (f"{tier}: {why}" if tier
+                                                 else why)
+        row["identity_tier"] = tier or ""
     else:
         row["present"] = "dormant"
     row["errors"] = errors
@@ -406,7 +466,7 @@ def main(argv=None):
             break
 
     cols = ["domain", "region", "brand_core", "marketplace", "present",
-            "brand_in_titles", "identity_evidence", "handles",
+            "brand_in_titles", "identity_tier", "identity_evidence", "handles",
             "rejected_handles", "listings", "categories", "errors",
             "sample_title", "notes"]
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
