@@ -17,8 +17,9 @@ and at least one survives full contribution economics.
 `identity-coverage.csv` is the store/category coverage matrix and
 `identity-ledger.csv.gz` is the variant-level evidence. The audit samples a
 stable five-product panel per Shopify storefront, validates GTIN check digits,
-and flags GTINs reused across variants. Read `IDENTITY-AUDIT.md` before using
-the result as a sourcing filter.
+and rejects GTINs reused across variants within one store. The four manually
+reviewed collisions are classified in `identifier-collisions.csv`. Read
+`IDENTITY-AUDIT.md` before using the result as a sourcing filter.
 
 Regenerate it from a rebuilt database with:
 
@@ -27,7 +28,17 @@ python3 scan.py identity-audit
 ```
 
 Add `--resolve-ebay` only when `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` are
-set. Exact marketplace confirmation is never replaced with synthetic data.
+set. A bounded live gate that inspects up to 50 returned listings per GTIN is:
+
+```bash
+python3 scan.py identity-audit --resolve-ebay \
+  --max-ebay-lookups 100 --ebay-detail-limit 50 \
+  --min-market-listings 3
+```
+
+The resolver batches item details through eBay `getItems`, writes inspected
+listing evidence to `ebay-resolution-ledger.csv.gz`, and never replaces exact
+marketplace confirmation with synthetic data.
 
 ## Open box and refurbished
 

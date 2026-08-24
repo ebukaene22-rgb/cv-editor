@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -28,6 +29,7 @@ class IdentifierTests(unittest.TestCase):
 
     def test_gtin_normalization_and_check_digit(self):
         self.assertEqual(ID.normalize_gtin("847974-010426"), "847974010426")
+        self.assertEqual(ID.gtin_type("847974010426"), "UPC-A")
         self.assertTrue(ID.valid_gtin("847974010426"))
         self.assertFalse(ID.valid_gtin("847974010427"))
         self.assertIsNone(ID.normalize_gtin("SKU847974010426"))
@@ -57,9 +59,12 @@ class IdentifierTests(unittest.TestCase):
                 "id": 20, "title": "B", "vendor": "Maker",
                 "variants": [
                     {"id": 3, "title": "Three", "sku": "SKU-B",
-                     "barcode": "847974010427", "price": 2000,
+                     "barcode": "4006381333931", "price": 2000,
                      "available": True},
                     {"id": 4, "title": "Four", "sku": "",
+                     "barcode": "847974010427", "price": 2000,
+                     "available": True},
+                    {"id": 5, "title": "Five", "sku": "",
                      "barcode": None, "price": 2000, "available": True},
                 ],
             },
@@ -69,35 +74,105 @@ class IdentifierTests(unittest.TestCase):
             return payloads[url]
 
         class Ebay:
-            def lookup_gtin(self, gtin, region):
-                return {"n": 4, "exact_gtin_items": 2}
+            def lookup_gtin(self, gtin, region, **kwargs):
+                return {"n": 4, "inspected": 4, "exact_gtin_items": 4,
+                        "coherent": True, "usable_market": True,
+                        "resolution_status": "EXACT_USABLE", "median": 25,
+                        "p25": 20, "p75": 30, "currency": "USD"}
 
         stores = [{"platform": "shopify", "domain": "shop.test",
                    "currency": "USD", "region": "US", "group": "parts"}]
         with tempfile.TemporaryDirectory() as tmp:
             coverage = os.path.join(tmp, "coverage.csv")
             ledger = os.path.join(tmp, "ledger.csv.gz")
+            resolution = os.path.join(tmp, "resolution.csv.gz")
             totals = ID.run_audit(
                 self.conn, stores, coverage, ledger, sample_per_store=10,
-                delay=0, fetcher=fetcher, ebay=Ebay(), max_ebay_lookups=10)
+                delay=0, fetcher=fetcher, ebay=Ebay(), max_ebay_lookups=10,
+                resolution_path=resolution)
             with open(coverage, newline="") as stream:
                 rows = list(csv.DictReader(stream))
             with gzip.open(ledger, "rt", newline="") as stream:
                 evidence = list(csv.DictReader(stream))
 
         store = next(row for row in rows if row["row_scope"] == "store_total")
-        self.assertEqual(totals["variants"], 4)
-        self.assertEqual(store["variants_with_valid_gtin"], "2")
-        self.assertEqual(store["gtin_coverage_pct"], "50.00")
+        self.assertEqual(totals["variants"], 5)
+        self.assertEqual(store["variants_with_valid_gtin"], "3")
+        self.assertEqual(store["gtin_coverage_pct"], "60.00")
         self.assertEqual(store["invalid_barcodes"], "1")
         self.assertEqual(store["gtin_collision_groups"], "1")
+        self.assertEqual(store["variants_with_exact_source_identity"], "1")
+        self.assertEqual(store["source_identity_coverage_pct"], "20.00")
         self.assertEqual(store["ebay_gtins_exact_confirmed"], "1")
-        self.assertEqual(len(evidence), 4)
+        self.assertEqual(store["ebay_gtins_usable_market"], "1")
+        self.assertEqual(len(evidence), 5)
+        collision = [row for row in evidence if row["gtin"] == "847974010426"]
+        self.assertTrue(all(row["source_identity_status"] ==
+                            "REJECT_SOURCE_COLLISION" for row in collision))
+        exact = next(row for row in evidence if row["gtin"] == "4006381333931")
+        self.assertEqual(exact["identity_status"], "EXACT")
 
     def test_exact_gtin_lookup_never_uses_synthetic_data(self):
         client = comp.EbayComp(self.conn, synthetic=True)
         with self.assertRaises(RuntimeError):
             client.lookup_gtin("847974010426")
+
+    def test_gtin_lookup_batches_details_and_requires_coherence(self):
+        client = comp.EbayComp(self.conn, synthetic=True)
+        calls = []
+        conflict = [False]
+
+        def browse(url, marketplace):
+            calls.append(url)
+            if "item_summary" in url:
+                return {"total": 2, "itemSummaries": [
+                    {"itemId": "v1|1|0"}, {"itemId": "v1|2|0"}]}
+            return {"items": [
+                {"itemId": "v1|1|0", "title": "Widget", "gtin": "847974010426",
+                 "brand": "Maker", "model": "W1", "categoryId": "1",
+                 "price": {"value": "20", "currency": "GBP"}},
+                {"itemId": "v1|2|0", "title": "Widget", "gtin": "847974010426",
+                 "brand": "Maker", "model": "W2" if conflict[0] else "W1",
+                 "categoryId": "1",
+                 "price": {"value": "30", "currency": "GBP"}},
+            ]}
+
+        client._browse_json = browse
+        result = client._live_gtin("847974010426", "EBAY_GB", 50, 20, 3)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(result["exact_gtin_items"], 2)
+        self.assertTrue(result["coherent"])
+        self.assertFalse(result["usable_market"])
+        self.assertEqual(result["resolution_status"], "EXACT_SHALLOW")
+        self.assertEqual(result["median"], 25)
+        conflict[0] = True
+        result = client._live_gtin("847974010426", "EBAY_GB", 50, 20, 3)
+        self.assertFalse(result["coherent"])
+        self.assertEqual(result["resolution_status"], "AMBIGUOUS")
+        self.assertEqual(result["ambiguous_fields"], ["model"])
+
+    def test_gtin_lookup_chunks_bulk_item_details(self):
+        client = comp.EbayComp(self.conn, synthetic=True)
+        calls = []
+
+        def browse(url, marketplace):
+            calls.append(url)
+            if "item_summary" in url:
+                return {"total": 21, "itemSummaries": [
+                    {"itemId": f"v1|{index}|0"} for index in range(21)]}
+            ids = urllib.parse.parse_qs(
+                urllib.parse.urlsplit(url).query)["item_ids"][0].split(",")
+            return {"items": [
+                {"itemId": item_id, "gtin": "847974010426",
+                 "brand": "Maker", "model": "W1", "categoryId": "1",
+                 "price": {"value": "20", "currency": "GBP"}}
+                for item_id in ids]}
+
+        client._browse_json = browse
+        result = client._live_gtin("847974010426", "EBAY_GB", 50, 50, 3)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(result["inspected"], 21)
+        self.assertEqual(result["resolution_status"], "EXACT_USABLE")
 
     def test_audit_retries_rate_limits(self):
         self.add("SKU-A", "https://shop.test/products/a")

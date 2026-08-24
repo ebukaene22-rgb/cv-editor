@@ -1,0 +1,5 @@
+domain,gtin,variants,classification,handling,reason
+moft.us,6972243543733,10,MALFORMED_SOURCE_DATA,REJECT_SOURCE_COLLISION,Same GTIN is assigned to materially different phone compatibility and colour variants
+moft.us,6972243543672,3,MALFORMED_SOURCE_DATA,REJECT_SOURCE_COLLISION,Same GTIN is assigned to materially different iPhone 15 Pro Max Pro and Plus variants
+moft.us,6972243543498,3,MALFORMED_SOURCE_DATA,REJECT_SOURCE_COLLISION,Same GTIN is assigned to materially different iPhone 15 Pro Max Pro and Plus variants
+www.deathwishcoffee.com,810063345044,4,MALFORMED_SOURCE_DATA,REJECT_SOURCE_COLLISION,Same GTIN is assigned to materially different 10 20 50 and 100 count packs

@@ -3,7 +3,9 @@
 import csv
 import gzip
 import hashlib
+import json
 import os
+import statistics
 import time
 import urllib.error
 import urllib.parse
@@ -21,9 +23,23 @@ LEDGER_FIELDS = [
     "audited_at", "domain", "group", "region", "category", "source_url",
     "ajax_url", "fetch_status", "fetch_error", "product_id", "variant_id",
     "product_title", "variant_title", "vendor", "source_sku", "barcode_raw",
-    "gtin", "gtin_valid", "price_present", "availability_present",
+    "gtin", "gtin_type", "gtin_valid", "source_collision_status",
+    "source_identity_status", "price_present", "availability_present",
     "ebay_attempted", "ebay_query_resolved", "ebay_exact_confirmed",
-    "ebay_active_total", "ebay_exact_items",
+    "ebay_active_total", "ebay_inspected_items", "ebay_exact_items",
+    "ebay_coherent", "ebay_usable_market", "ebay_resolution_status",
+    "ebay_median_price", "ebay_p25_price", "ebay_p75_price",
+    "ebay_currency", "identity_status",
+]
+
+RESOLUTION_FIELDS = [
+    "audited_at", "gtin", "region", "resolution_status", "active_total",
+    "returned_items", "inspected_items", "exact_items", "coherent",
+    "usable_market", "ambiguous_fields", "median_price", "p25_price",
+    "p75_price", "currency", "item_id", "item_title", "item_gtin",
+    "item_exact_gtin", "item_brand", "item_mpn", "item_model", "item_size",
+    "item_color", "item_pack", "item_category", "item_lot_size",
+    "item_condition", "item_price", "item_currency",
 ]
 
 COVERAGE_FIELDS = [
@@ -36,9 +52,14 @@ COVERAGE_FIELDS = [
     "brand_coverage_pct", "variants_with_price", "price_coverage_pct",
     "variants_with_inventory_state", "inventory_coverage_pct",
     "variants_with_explicit_mpn", "mpn_coverage_pct",
+    "variants_with_exact_source_identity", "source_identity_coverage_pct",
     "deterministic_identity_coverage_pct", "ebay_gtins_attempted",
     "ebay_gtins_query_resolved", "ebay_query_resolution_rate_pct",
     "ebay_gtins_exact_confirmed", "ebay_exact_confirmation_rate_pct",
+    "ebay_gtins_coherent", "ebay_coherence_rate_pct",
+    "ebay_gtins_usable_market", "ebay_usable_market_rate_pct",
+    "ebay_active_count_median", "ebay_active_count_p25",
+    "ebay_active_count_p75", "ebay_exact_price_median",
 ]
 
 
@@ -63,6 +84,12 @@ def valid_gtin(value):
     for index, digit in enumerate(reversed(payload)):
         total += int(digit) * (3 if index % 2 == 0 else 1)
     return (10 - total % 10) % 10 == supplied
+
+
+def gtin_type(value):
+    digits = normalize_gtin(value)
+    return {8: "GTIN-8", 12: "UPC-A", 13: "EAN-13", 14: "GTIN-14"}.get(
+        len(digits) if digits else 0, "")
 
 
 def product_ajax_url(source_url):
@@ -92,7 +119,6 @@ def fetch_product(url, timeout=20):
         raw = response.read()
         if response.headers.get("Content-Encoding") == "gzip":
             raw = gzip.decompress(raw)
-    import json
     return json.loads(raw.decode("utf-8", "replace"))
 
 
@@ -111,6 +137,15 @@ def _write(path, fields, rows):
 
 def _pct(numerator, denominator):
     return numerator / denominator * 100.0 if denominator else 0.0
+
+
+def _distribution(values):
+    values = sorted(values)
+    if not values:
+        return "", "", ""
+    return (f"{statistics.median(values):.2f}",
+            f"{values[max(0, len(values) // 4 - 1)]:.2f}",
+            f"{values[min(len(values) - 1, 3 * len(values) // 4)]:.2f}")
 
 
 def _latest_products(conn, platform_by_domain, only_domain=None):
@@ -169,21 +204,97 @@ def _variant_rows(product, data, audited_at):
             "vendor": data.get("vendor") or "",
             "source_sku": (variant.get("sku") or "").strip(),
             "barcode_raw": "" if raw is None else str(raw),
-            "gtin": normalized or "", "gtin_valid": int(is_valid),
+            "gtin": normalized or "", "gtin_type": gtin_type(raw),
+            "gtin_valid": int(is_valid), "source_collision_status": "",
+            "source_identity_status": "",
             "price_present": int(variant.get("price") is not None),
             "availability_present": int("available" in variant),
             "ebay_attempted": 0, "ebay_query_resolved": 0,
             "ebay_exact_confirmed": 0, "ebay_active_total": "",
-            "ebay_exact_items": "",
+            "ebay_inspected_items": "", "ebay_exact_items": "",
+            "ebay_coherent": 0, "ebay_usable_market": 0,
+            "ebay_resolution_status": "NOT_ATTEMPTED",
+            "ebay_median_price": "", "ebay_p25_price": "",
+            "ebay_p75_price": "", "ebay_currency": "",
+            "identity_status": "REJECT",
         })
     return rows
 
 
-def _resolve_ebay(rows, ebay, region, max_lookups):
-    gtins = sorted({row["gtin"] for row in rows if row["gtin_valid"]})
+def _classify_source_identity(rows):
+    members = defaultdict(set)
+    for row in rows:
+        if row.get("fetch_status") == "ok" and row.get("gtin_valid"):
+            members[(row["domain"], row["gtin"])].add(
+                (row["ajax_url"], row["variant_id"]))
+    for row in rows:
+        if row.get("fetch_status") != "ok":
+            continue
+        if not row.get("barcode_raw"):
+            row["source_collision_status"] = "NOT_APPLICABLE"
+            row["source_identity_status"] = "REJECT_MISSING_IDENTIFIER"
+        elif not row.get("gtin_valid"):
+            row["source_collision_status"] = "NOT_APPLICABLE"
+            row["source_identity_status"] = "REJECT_INVALID_GTIN"
+        elif len(members[(row["domain"], row["gtin"])]) > 1:
+            row["source_collision_status"] = "COLLISION"
+            row["source_identity_status"] = "REJECT_SOURCE_COLLISION"
+        else:
+            row["source_collision_status"] = "UNIQUE_WITHIN_STORE"
+            row["source_identity_status"] = "EXACT_SOURCE"
+
+
+def _resolution_rows(results, audited_at, region):
+    rows = []
+    for gtin, result in sorted(results.items()):
+        result = result or {}
+        base = {
+            "audited_at": audited_at, "gtin": gtin, "region": region,
+            "resolution_status": result.get("resolution_status", "API_ERROR"),
+            "active_total": result.get("n", ""),
+            "returned_items": result.get("returned", ""),
+            "inspected_items": result.get("inspected", ""),
+            "exact_items": result.get("exact_gtin_items", ""),
+            "coherent": int(bool(result.get("coherent"))),
+            "usable_market": int(bool(result.get("usable_market"))),
+            "ambiguous_fields": ",".join(result.get("ambiguous_fields", [])),
+            "median_price": result.get("median") or "",
+            "p25_price": result.get("p25") or "",
+            "p75_price": result.get("p75") or "",
+            "currency": result.get("currency") or "",
+        }
+        items = result.get("items") or [None]
+        for item in items:
+            item = item or {}
+            rows.append({
+                **base, "item_id": item.get("id", ""),
+                "item_title": item.get("title", ""),
+                "item_gtin": item.get("gtin", ""),
+                "item_exact_gtin": int(bool(item.get("exact_gtin"))),
+                "item_brand": item.get("brand", ""),
+                "item_mpn": item.get("mpn", ""),
+                "item_model": item.get("model", ""),
+                "item_size": item.get("size", ""),
+                "item_color": item.get("color", ""),
+                "item_pack": item.get("pack", ""),
+                "item_category": item.get("category", ""),
+                "item_lot_size": item.get("lot_size", ""),
+                "item_condition": item.get("condition", ""),
+                "item_price": item.get("price", ""),
+                "item_currency": item.get("currency", ""),
+            })
+    return rows
+
+
+def _resolve_ebay(rows, ebay, region, max_lookups, detail_limit,
+                  min_market_listings):
+    gtins = sorted({row["gtin"] for row in rows
+                    if row.get("source_identity_status") == "EXACT_SOURCE"})
     results = {}
     for gtin in gtins[:max_lookups]:
-        result = ebay.lookup_gtin(gtin, region=region)
+        result = ebay.lookup_gtin(
+            gtin, region=region, detail_limit=detail_limit,
+            min_market_listings=min_market_listings)
         results[gtin] = result
     for row in rows:
         if row["gtin"] not in results:
@@ -194,8 +305,24 @@ def _resolve_ebay(rows, ebay, region, max_lookups):
         row["ebay_exact_confirmed"] = int(bool(
             result and result.get("exact_gtin_items", 0)))
         row["ebay_active_total"] = result.get("n", 0) if result else 0
+        row["ebay_inspected_items"] = (
+            result.get("inspected", 0) if result else 0)
         row["ebay_exact_items"] = (
             result.get("exact_gtin_items", 0) if result else 0)
+        row["ebay_coherent"] = int(bool(result and result.get("coherent")))
+        row["ebay_usable_market"] = int(bool(
+            result and result.get("usable_market")))
+        row["ebay_resolution_status"] = (
+            result.get("resolution_status", "API_ERROR")
+            if result else "API_ERROR")
+        row["ebay_median_price"] = result.get("median") or "" if result else ""
+        row["ebay_p25_price"] = result.get("p25") or "" if result else ""
+        row["ebay_p75_price"] = result.get("p75") or "" if result else ""
+        row["ebay_currency"] = result.get("currency") or "" if result else ""
+        row["identity_status"] = (
+            "EXACT" if result and result.get("resolution_status") in
+            {"EXACT_USABLE", "EXACT_SHALLOW"} else "REJECT")
+    return results
 
 
 def _audit_store(products, fetcher, timeout, delay, audited_at, retries):
@@ -239,6 +366,8 @@ def _coverage_row(rows, product_fetches, audited_at, scope, domain,
     with_brand = sum(bool(row["vendor"]) for row in variants)
     with_price = sum(bool(row["price_present"]) for row in variants)
     with_inventory = sum(bool(row["availability_present"]) for row in variants)
+    with_source_identity = sum(
+        row["source_identity_status"] == "EXACT_SOURCE" for row in variants)
 
     identities = defaultdict(set)
     for row in variants:
@@ -253,6 +382,19 @@ def _coverage_row(rows, product_fetches, audited_at, scope, domain,
                       if row["ebay_query_resolved"]}
     exact_confirmed = {row["gtin"] for row in variants
                        if row["ebay_exact_confirmed"]}
+    coherent = {row["gtin"] for row in variants if row["ebay_coherent"]}
+    usable = {row["gtin"] for row in variants if row["ebay_usable_market"]}
+    attempted_rows = {}
+    for row in variants:
+        if row["ebay_attempted"]:
+            attempted_rows.setdefault(row["gtin"], row)
+    active_counts = [int(row["ebay_active_total"] or 0)
+                     for row in attempted_rows.values()
+                     if row["ebay_query_resolved"]]
+    exact_prices = [float(row["ebay_median_price"])
+                    for row in attempted_rows.values()
+                    if row["ebay_median_price"] not in ("", None)]
+    active_median, active_p25, active_p75 = _distribution(active_counts)
     fetches = product_fetches if scope == "store_total" else []
     return {
         "audited_at": audited_at, "row_scope": scope, "domain": domain,
@@ -276,19 +418,31 @@ def _coverage_row(rows, product_fetches, audited_at, scope, domain,
         "inventory_coverage_pct": f"{_pct(with_inventory, total):.2f}",
         # Shopify Ajax provides SKU and barcode, not an explicit MPN field.
         "variants_with_explicit_mpn": 0, "mpn_coverage_pct": "0.00",
-        "deterministic_identity_coverage_pct": f"{_pct(with_gtin, total):.2f}",
+        "variants_with_exact_source_identity": with_source_identity,
+        "source_identity_coverage_pct": f"{_pct(with_source_identity, total):.2f}",
+        "deterministic_identity_coverage_pct": f"{_pct(with_source_identity, total):.2f}",
         "ebay_gtins_attempted": len(attempted),
         "ebay_gtins_query_resolved": len(query_resolved),
         "ebay_query_resolution_rate_pct": f"{_pct(len(query_resolved), len(attempted)):.2f}",
         "ebay_gtins_exact_confirmed": len(exact_confirmed),
         "ebay_exact_confirmation_rate_pct": f"{_pct(len(exact_confirmed), len(attempted)):.2f}",
+        "ebay_gtins_coherent": len(coherent),
+        "ebay_coherence_rate_pct": f"{_pct(len(coherent), len(attempted)):.2f}",
+        "ebay_gtins_usable_market": len(usable),
+        "ebay_usable_market_rate_pct": f"{_pct(len(usable), len(attempted)):.2f}",
+        "ebay_active_count_median": active_median,
+        "ebay_active_count_p25": active_p25,
+        "ebay_active_count_p75": active_p75,
+        "ebay_exact_price_median": (
+            f"{statistics.median(exact_prices):.2f}" if exact_prices else ""),
     }
 
 
 def run_audit(conn, stores, out_path, ledger_path, sample_per_store=5,
               delay=0.15, timeout=20, only_domain=None, ebay=None,
               ebay_region="GB", max_ebay_lookups=100, fetcher=None,
-              workers=4, retries=2):
+              workers=4, retries=2, ebay_detail_limit=50,
+              min_market_listings=3, resolution_path=None):
     audited_at = now()
     platform = {store["domain"]: store["platform"] for store in stores}
     products = _latest_products(conn, platform, only_domain=only_domain)
@@ -308,8 +462,15 @@ def run_audit(conn, stores, out_path, ledger_path, sample_per_store=5,
             ledger.extend(store_ledger)
             fetches.extend(store_fetches)
 
+    _classify_source_identity(ledger)
+    results = {}
     if ebay is not None:
-        _resolve_ebay(ledger, ebay, ebay_region, max_ebay_lookups)
+        results = _resolve_ebay(
+            ledger, ebay, ebay_region, max_ebay_lookups, ebay_detail_limit,
+            min_market_listings)
+    if resolution_path:
+        _write(resolution_path, RESOLUTION_FIELDS,
+               _resolution_rows(results, audited_at, ebay_region))
 
     coverage = []
     domains = sorted({product["domain"] for product in selected})
@@ -341,6 +502,15 @@ def run_audit(conn, stores, out_path, ledger_path, sample_per_store=5,
         "variants": sum(row.get("fetch_status") == "ok" for row in ledger),
         "valid_gtins": sum(bool(row.get("gtin_valid")) for row in ledger),
         "coverage_rows": len(coverage), "ledger_rows": len(ledger),
+        "ebay_gtins_attempted": len(results),
+        "ebay_gtins_query_resolved": sum(
+            bool(result and result.get("n")) for result in results.values()),
+        "ebay_gtins_coherent": sum(
+            bool(result and result.get("coherent"))
+            for result in results.values()),
+        "ebay_gtins_usable_market": sum(
+            bool(result and result.get("usable_market"))
+            for result in results.values()),
     }
     totals["gtin_coverage_pct"] = _pct(totals["valid_gtins"], totals["variants"])
     return totals

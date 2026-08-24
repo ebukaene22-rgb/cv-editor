@@ -436,7 +436,9 @@ def cmd_identity_audit(args):
         timeout=args.timeout, only_domain=args.only_domain, ebay=ebay,
         ebay_region=args.ebay_region,
         max_ebay_lookups=args.max_ebay_lookups, workers=args.workers,
-        retries=args.retries)
+        retries=args.retries, ebay_detail_limit=args.ebay_detail_limit,
+        min_market_listings=args.min_market_listings,
+        resolution_path=args.ebay_ledger_out if args.resolve_ebay else None)
     print(f"identity audit: {totals['domains']} stores, "
           f"{totals['products_succeeded']}/{totals['products_requested']} "
           f"product endpoints succeeded")
@@ -444,6 +446,12 @@ def cmd_identity_audit(args):
           f"{totals['valid_gtins']:,} ({totals['gtin_coverage_pct']:.2f}%)")
     print(f"coverage matrix -> {args.out}")
     print(f"evidence ledger -> {args.ledger_out}")
+    if args.resolve_ebay:
+        print(f"eBay: {totals['ebay_gtins_query_resolved']}/"
+              f"{totals['ebay_gtins_attempted']} queries resolved; "
+              f"{totals['ebay_gtins_coherent']} coherent; "
+              f"{totals['ebay_gtins_usable_market']} usable markets")
+        print(f"eBay evidence -> {args.ebay_ledger_out}")
 
 
 def cmd_openbox_cohort(args):
@@ -676,6 +684,10 @@ def main():
     ia.add_argument("--resolve-ebay", action="store_true")
     ia.add_argument("--ebay-region", default="GB")
     ia.add_argument("--max-ebay-lookups", type=int, default=100)
+    ia.add_argument("--ebay-detail-limit", type=int, default=50)
+    ia.add_argument("--min-market-listings", type=int, default=3)
+    ia.add_argument("--ebay-ledger-out",
+                    default="experiments/ebay-resolution-ledger.csv.gz")
     ia.set_defaults(fn=cmd_identity_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
