@@ -389,6 +389,12 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
         row["identity_tier"] = tier or ""
     else:
         row["present"] = "dormant"
+    if not row.get("identity_tier"):
+        # No qualifying active listing means the identity test was never
+        # executable. That is not_testable, NOT legal_info_unavailable --
+        # folding it in would inflate the denominator with rows the test
+        # never ran on.
+        row["identity_tier"] = legalid.NOT_TESTABLE
     row["errors"] = errors
 
     row["brand_in_titles"] = "yes" if attributed else "no"
@@ -498,19 +504,35 @@ def main(argv=None):
     # legal_info_unavailable says the experiment could not tell. Never report
     # one number for both.
     power = legalid.resolving_power(
-        [r.get("identity_tier") or "" for r in rows
-         if r["present"] in ("confirmed_active", "candidate_active")])
-    if any(power.values()):
-        print("\nidentity evidence among active rows:", file=sys.stderr)
+        [r.get("identity_tier") or legalid.NOT_TESTABLE for r in rows
+         if r["present"] != "inconclusive"])
+    if power["population"]:
+        print("\nidentity evidence:", file=sys.stderr)
         for k in ("confirmed", "corroborated", "supporting", "no_match",
-                  "unavailable"):
+                  "unavailable", "not_testable"):
             print(f"  {k:14} {power[k]:>4}", file=sys.stderr)
-        if power["unavailable"] > power["no_match"]:
-            print("  -> dominated by UNAVAILABLE: low resolving power, "
-                  "NOT evidence against ownership", file=sys.stderr)
-        elif power["no_match"]:
-            print("  -> no_match present: real evidence against first-party "
-                  "ownership for those rows", file=sys.stderr)
+        cov = power["coverage"]
+        pw = power["power"]
+        print(f"  coverage {power['attempted']}/{power['population']}"
+              f" ({cov:.1%}) -- how often the test was executable",
+              file=sys.stderr)
+        if pw is None:
+            print("  power    n/a -- the identity test never ran; these rows "
+                  "speak to INCIDENCE only", file=sys.stderr)
+        else:
+            print(f"  power    {power['observable']}/{power['attempted']}"
+                  f" ({pw:.1%}) -- how often it resolved when it DID run",
+                  file=sys.stderr)
+            print(f"  confirmed among attempted: {power['confirmed']}/"
+                  f"{power['attempted']}  (NOT /{power['population']} -- "
+                  f"composition is not method performance)", file=sys.stderr)
+            if power["unavailable"] > power["no_match"]:
+                print("  -> attempted rows dominated by UNAVAILABLE: low "
+                      "resolving power, NOT evidence against ownership",
+                      file=sys.stderr)
+            elif power["no_match"]:
+                print("  -> no_match present: real evidence against "
+                      "first-party ownership for those rows", file=sys.stderr)
     print("\nall figures are LOWER BOUNDS on presence", file=sys.stderr)
     if inc:
         print(f"INCONCLUSIVE (API errors, excluded): {inc} "

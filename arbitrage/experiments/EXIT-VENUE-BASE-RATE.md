@@ -80,7 +80,8 @@ Evidence hierarchy, strongest first:
 | `name_address` | legal name AND postcode match | strong, not confirming |
 | `name` | legal name alone | supporting only |
 | `no_match` | details published, none match | **evidence AGAINST ownership** |
-| `legal_info_unavailable` | no legal block on any sampled listing | **no resolving power** |
+| `legal_info_unavailable` | listings sampled, no legal block on any | **no resolving power** |
+| `not_testable` | no qualifying active listing to sample | **test never executable** |
 
 ### Required in the results table: `no_match` vs `legal_info_unavailable`
 
@@ -95,6 +96,31 @@ Reporting one "unconfirmed" number for both hides which of the two you have,
 and a low confirmation rate is uninterpretable without the split. They are
 distinct values in `identity_tier`, never a shared blank, and
 `legalid.resolving_power()` prints the breakdown at the end of every run.
+
+### Required: two denominators, never one rate
+
+`not_testable` is a third state and must not be folded into
+`legal_info_unavailable`. `legal_info_unavailable` means listings existed,
+were sampled, and carried no legal block. A `dormant` or `not_detected` row
+has no listing to sample at all — the test was never executable. Mixing them
+inflates the denominator with rows the method never ran on.
+
+    coverage = attempted / population     how often the test was executable
+    power    = observable / attempted     how often it resolved when it ran
+
+Worked example. If the DTC arm lands at 32 dormant + 18 not_detected + 4
+sampled-but-bare + 2 confirmed, the naive reading is 2/56 = **3.6%** and
+makes legal-identity matching look near-useless. The honest reading is that
+the test ran on 6 rows and resolved 2: coverage 10.7%, **33.3%** confirmed
+among attempted. The other 50 rows are evidence for the INCIDENCE
+discriminator and say nothing about identity matching.
+
+The three discriminators need not have equal power in both arms, and the
+report must not force them to. DTC is likely strongly informative on
+incidence and intensity while contributing almost nothing on identity;
+dealers, where listings are abundant, are likely the reverse. **No global
+"identity confirmation rate" across both arms** — that lets population
+composition masquerade as method performance.
 
 Names and addresses need fuzzy matching, and fuzzy matching invites exactly
 the false positives presence detection cannot afford — hence only the two

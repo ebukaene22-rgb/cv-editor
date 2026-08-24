@@ -141,7 +141,25 @@ CONFIRMING = ("registration", "vat")
 # clothes. Reporting them as one number hides which of those you have.
 NO_MATCH = "no_match"
 UNAVAILABLE = "legal_info_unavailable"
-NON_EVIDENCE = (NO_MATCH, UNAVAILABLE)
+
+# A third non-evidence outcome, and it must not be folded into UNAVAILABLE.
+#
+#   not_testable  there was no qualifying active listing to request identity
+#                 evidence from. The test was never executable.
+#
+# UNAVAILABLE now means something precise: listings existed, were sampled,
+# and carried no legal block. A dormant or not_detected row has no listing to
+# sample at all. Putting those in the same bucket inflates the denominator
+# with rows the test never ran on, and makes the identity method look useless
+# when it was simply not exercised -- the same failure pattern as before, one
+# level up.
+NOT_TESTABLE = "not_testable"
+
+NON_EVIDENCE = (NO_MATCH, UNAVAILABLE, NOT_TESTABLE)
+
+# Tiers on which legal identity was actually OBSERVABLE. no_match belongs
+# here: contradicting evidence is still evidence the mechanism worked.
+OBSERVABLE = TIERS + (NO_MATCH,)
 
 
 def extract(item):
@@ -244,17 +262,29 @@ def is_confirming(tier):
 
 def resolving_power(tiers):
     """
-    Summarise a candidate population by what the evidence actually says.
+    Summarise a population by what the evidence says AND by whether the
+    identity test could run at all.
 
-    -> {'confirmed','corroborated','supporting','no_match','unavailable'}
+    Two denominators, deliberately kept apart:
 
-    Read `no_match` against `unavailable` before drawing any conclusion from
-    a low confirmation rate: the first says these sellers are probably not
-    the source, the second says the experiment could not tell.
+      coverage  = attempted / population
+                  how often the identity test was executable
+      power     = observable / attempted
+                  how often it resolved anything WHEN it ran
+
+    Collapsing these into one "identity confirmation rate" lets population
+    composition masquerade as method performance. A DTC arm of 32 dormant +
+    18 not_detected + 4 sampled-but-bare + 2 confirmed is not "2/56 = 4%
+    confirmation": the test ran on 6 rows and resolved 2 of them. The other
+    50 rows are evidence for the INCIDENCE discriminator, and say nothing
+    about legal-identity matching.
+
+    -> counts, plus 'attempted', 'observable', 'population', 'coverage'
+       and 'power' (None when the denominator is zero).
     """
     out = dict.fromkeys(
         ("confirmed", "corroborated", "supporting", "no_match",
-         "unavailable"), 0)
+         "unavailable", "not_testable"), 0)
     for t in tiers:
         if t in CONFIRMING:
             out["confirmed"] += 1
@@ -266,4 +296,16 @@ def resolving_power(tiers):
             out["no_match"] += 1
         elif t == UNAVAILABLE:
             out["unavailable"] += 1
+        else:
+            out["not_testable"] += 1
+    out["population"] = sum(out[k] for k in (
+        "confirmed", "corroborated", "supporting", "no_match",
+        "unavailable", "not_testable"))
+    out["attempted"] = out["population"] - out["not_testable"]
+    out["observable"] = (out["confirmed"] + out["corroborated"]
+                         + out["supporting"] + out["no_match"])
+    out["coverage"] = (out["attempted"] / out["population"]
+                       if out["population"] else None)
+    out["power"] = (out["observable"] / out["attempted"]
+                    if out["attempted"] else None)
     return out

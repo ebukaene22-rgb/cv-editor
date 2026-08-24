@@ -135,12 +135,21 @@ class ResolvingPower(unittest.TestCase):
         got = legalid.resolving_power(
             ["registration", "vat", "name_address", "name",
              legalid.NO_MATCH, legalid.UNAVAILABLE, legalid.UNAVAILABLE])
-        self.assertEqual(got, {"confirmed": 2, "corroborated": 1,
-                               "supporting": 1, "no_match": 1,
-                               "unavailable": 2})
+        counts = {k: got[k] for k in
+                  ("confirmed", "corroborated", "supporting", "no_match",
+                   "unavailable", "not_testable")}
+        self.assertEqual(counts, {"confirmed": 2, "corroborated": 1,
+                                  "supporting": 1, "no_match": 1,
+                                  "unavailable": 2, "not_testable": 0})
+        # every row here was sampled, so all were attempted
+        self.assertEqual(got["attempted"], 7)
+        self.assertEqual(got["observable"], 5)
 
     def test_empty_population(self):
-        self.assertEqual(sum(legalid.resolving_power([]).values()), 0)
+        got = legalid.resolving_power([])
+        self.assertEqual(got["population"], 0)
+        self.assertEqual(got["attempted"], 0)
+        self.assertIsNone(got["power"])
 
     def test_best_of_prefers_strongest_tier(self):
         obs = [legalid.extract(item(name="IT In Stock Ltd")),
@@ -151,3 +160,44 @@ class ResolvingPower(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Denominators(unittest.TestCase):
+    """A row with no listing to sample is not_testable, not unavailable."""
+
+    POP = (["not_testable"] * 50 + [legalid.UNAVAILABLE] * 4
+           + ["registration", "vat"])
+
+    def test_not_testable_is_excluded_from_attempted(self):
+        r = legalid.resolving_power(self.POP)
+        self.assertEqual(r["population"], 56)
+        self.assertEqual(r["not_testable"], 50)
+        self.assertEqual(r["attempted"], 6)
+
+    def test_power_uses_the_attempted_denominator(self):
+        r = legalid.resolving_power(self.POP)
+        self.assertAlmostEqual(r["power"], 2 / 6)
+        self.assertAlmostEqual(r["coverage"], 6 / 56)
+        # the naive rate the split exists to prevent
+        self.assertNotAlmostEqual(r["power"], 2 / 56)
+
+    def test_no_match_counts_as_observable(self):
+        # contradicting evidence still means the mechanism worked
+        r = legalid.resolving_power([legalid.NO_MATCH, "registration"])
+        self.assertEqual(r["observable"], 2)
+        self.assertEqual(r["attempted"], 2)
+
+    def test_all_untestable_reports_no_power(self):
+        r = legalid.resolving_power(["not_testable"] * 5)
+        self.assertEqual(r["attempted"], 0)
+        self.assertIsNone(r["power"])
+        self.assertEqual(r["coverage"], 0.0)
+
+    def test_unknown_tier_defaults_to_not_testable(self):
+        r = legalid.resolving_power(["", None])
+        self.assertEqual(r["not_testable"], 2)
+
+    def test_empty_population_has_no_rates(self):
+        r = legalid.resolving_power([])
+        self.assertIsNone(r["power"])
+        self.assertIsNone(r["coverage"])
