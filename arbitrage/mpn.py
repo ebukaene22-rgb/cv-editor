@@ -69,7 +69,8 @@ SOURCE_CONDITIONS = {
 MANIFEST_FIELDS = [
     "source", "lot_id", "lot_url", "lot_ask_price_usd", "lot_units",
     "lot_condition", "manifest_accuracy_risk_pct", "line_manufacturer",
-    "line_model", "line_condition", "line_upc", "line_quantity",
+    "line_title", "line_category", "line_model", "line_condition",
+    "line_upc", "line_quantity",
     "line_retail_price_usd", "frozen_brand", "frozen_mpn",
     "identity_status", "audited_at",
 ]
@@ -553,6 +554,8 @@ def run_manifest_audit(urls, resolution_path, out_path, timeout=30):
                 "lot_condition": lot.get("condition") or "",
                 "manifest_accuracy_risk_pct": "15",
                 "line_manufacturer": line.get("manufacturer") or "",
+                "line_title": line.get("title") or "",
+                "line_category": line.get("category") or "",
                 "line_model": line.get("model") or "",
                 "line_condition": line.get("condition") or "",
                 "line_upc": line.get("upc") or "",

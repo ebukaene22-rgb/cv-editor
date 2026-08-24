@@ -553,7 +553,7 @@ def cmd_mpn_manifest_audit(args):
     elif totals["coverage_gate_passed"]:
         verdict = "ADVANCE_LOT_ECONOMICS"
     else:
-        verdict = "KILL_LIQUIDATION_COVERAGE"
+        verdict = "KILL_FROZEN_UNIVERSE_INTERSECTION"
     print(f"manifest audit: {totals['lots']} lots, "
           f"{totals['manifest_lines']} lines, {totals['manifest_units']} units")
     print(f"matched frozen identities: {totals['matched_identities']}; "

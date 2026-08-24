@@ -1,7 +1,7 @@
 # Exact-MPN manifested-liquidation gate
 
-Audit time: 2026-08-24 11:19 UTC  
-Demand universe: the same 16 exact-MPN eBay resolver survivors  
+Audit time: 2026-08-24 11:27 UTC
+Demand universe: the same 16 exact-MPN eBay resolver survivors
 Source: Direct Liquidation live appliance-accessories lots
 
 ## Method
@@ -22,15 +22,18 @@ source-class kill. Any matching line would then proceed to:
 
 | Metric | Result |
 |---|---:|
-| Live manifested lots | 2 |
-| Distinct manifest lines | 18 |
-| Total units | 25 |
+| Live manifested lots | 10 |
+| Distinct manifest lines | 91 |
+| Total units | 114 |
 | Frozen MPN matches | 0 |
-| Minimum sample reached | No |
+| Rows with usable model ID | 88/91 (96.7%) |
+| Rows with valid GTIN | 85/91 (93.4%) |
+| Minimum sample reached | Yes |
 
-One lot contains 24 mixed-condition units across 17 models at a USD 1,080.30
-ask price. The other contains one like-new Samsung pedestal at USD 153. None
-of the 18 line models is in the frozen 16-MPN demand universe.
+The sample deliberately includes the original two appliance-accessory lots and
+eight additional multi-unit appliance lots. The added manifests cover laundry,
+refrigerators, freezers, dishwashers, ovens, and related goods. None of the 91
+line models is in the frozen 16-MPN replacement-parts demand universe.
 
 Direct Liquidation states that the manifest may vary by up to 15% of units and
 that mixed customer returns are untested, may be incomplete, and are sold as
@@ -39,21 +42,27 @@ rate or freight quote.
 
 ## Decision
 
-**INSUFFICIENT_MANIFEST_SAMPLE.**
+**KILL_FROZEN_UNIVERSE_INTERSECTION / CHANGE_UNIVERSE CANDIDATE.**
 
-There is no basis for lot economics because there are no frozen-identity
-matches. There is also no basis for killing manifested liquidation after only
-two lots. Continue accumulating actual appliance-parts manifests until either:
+The pre-registered 10-lot stop has been reached with zero frozen matches, so
+the replacement-parts universe does not proceed to liquidation economics on
+this source. There is no basis for max-bid calculations because none of its
+demand identities occurs in the sampled supply.
 
-- at least three frozen identities appear and can enter lot economics; or
-- at least 10 relevant lots have been audited with fewer than three matches.
+This is not a kill of manifested liquidation generally. Identity quality is
+strong: 96.7% of lines expose a usable model and 93.4% expose a check-digit-valid
+GTIN. The deterministic unmatched identities are preserved separately in
+`mpn-manifest-unmatched-identities.csv`. That supports a controlled
+`CHANGE_UNIVERSE` experiment around exact finished-appliance models, without
+retroactively tuning the completed frozen-parts gate.
 
-This is the first acquisition test in the project that directly measures
-forced-disposal inventory at line level.
+The 15% manifest-accuracy haircut remains mandatory in any later max-bid test.
 
 ## Evidence
 
-- `mpn-manifest-ledger.csv`: 18 structured manifest lines.
+- `mpn-manifest-ledger.csv`: all 91 structured manifest lines.
+- `mpn-manifest-unmatched-identities.csv`: 83 deterministic unmatched model
+  identities, kept separate from the frozen universe.
 - Live lot 944526:
   <https://www.directliquidation.com/p/944526-1-pallet-24-pcs-accessories-kitchen-and-dining-fans-untested-customer-returns-panasonic-midea-sharp-electronics-broan/944526>
 - Live lot 943722:

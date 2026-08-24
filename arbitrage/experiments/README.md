@@ -105,9 +105,11 @@ Audit real Direct Liquidation product manifests against the frozen MPN set:
 python3 scan.py mpn-manifest-audit LOT_URL [LOT_URL ...]
 ```
 
-This parses structured line-level manufacturer, model, condition, UPC,
-quantity, and price fields. The current two-lot result and sample-size rule are
-in `MPN-MANIFEST-GATE.md`; evidence is in `mpn-manifest-ledger.csv`.
+This parses structured line-level manufacturer, title, category, model,
+condition, UPC, quantity, and price fields. The completed 10-lot result is in
+`MPN-MANIFEST-GATE.md`; evidence is in `mpn-manifest-ledger.csv`, with the
+deterministic non-frozen identities retained separately in
+`mpn-manifest-unmatched-identities.csv`.
 
 ## Open box and refurbished
 
