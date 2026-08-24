@@ -86,3 +86,35 @@ class FixedRatio(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MatchStrength(unittest.TestCase):
+    """The gymshark row: a reseller handle credited to the brand."""
+
+    def test_reseller_prefix_is_only_contains(self):
+        st, _ = selfcomp.match_strength("gymshark.com", "hidie_gymshark")
+        self.assertEqual(st, "contains")
+
+    def test_brand_suffix_is_stronger(self):
+        for handle in ("gymshark-store", "gymsharkuk", "gymshark_official"):
+            st, why = selfcomp.match_strength("gymshark.com", handle)
+            self.assertIn(st, ("exact", "suffix"), f"{handle}: {why}")
+
+    def test_exact_is_exact(self):
+        st, _ = selfcomp.match_strength("www.itinstock.com", "itinstock")
+        self.assertEqual(st, "exact")
+
+    def test_distinct_is_none(self):
+        st, _ = selfcomp.match_strength("www.itinstock.com", "inetgrouponline")
+        self.assertIsNone(st)
+
+    def test_comp_filtering_stays_permissive(self):
+        # over-dropping a comp only lowers apparent spread: safe direction
+        self.assertTrue(selfcomp.is_self_comp("gymshark.com",
+                                              "hidie_gymshark")[0])
+
+    def test_presence_counting_rejects_contains(self):
+        # crediting a reseller's stock to the brand would INVENT presence
+        strong = {"exact", "suffix"}
+        st, _ = selfcomp.match_strength("gymshark.com", "hidie_gymshark")
+        self.assertNotIn(st, strong)

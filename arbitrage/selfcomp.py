@@ -69,23 +69,60 @@ def _strip_noise(core):
     return core
 
 
+def match_strength(source_domain, seller_username):
+    """
+    -> (strength, reason). strength is 'exact', 'suffix', 'contains' or None.
+
+    The three are NOT interchangeable, and conflating them cost a real
+    result. A brand appends to its own name ('gymshark-store'); a reseller
+    PREPENDS its own identity to a brand it stocks ('hidie_gymshark'). Both
+    contain "gymshark", but only the first is plausibly Gymshark.
+
+      exact     normalised names are identical
+      suffix    seller is the source core plus trailing noise -- still
+                plausibly the source's own store
+      contains  the core appears with other leading tokens -- usually a
+                third-party reseller trading on the brand name
+
+    Callers must choose by which error hurts them:
+
+      * filtering comps (clean_comp) -- dropping a comp that is really an
+        independent seller only LOWERS apparent spread, so treat all three
+        as self and stay conservative.
+      * counting a source's presence in the exit venue (exitvenue) -- a
+        'contains' hit would credit a reseller's inventory to the brand and
+        INVENT presence, so only 'exact' and 'suffix' may count.
+    """
+    a = _strip_noise(_norm(source_domain))
+    b_raw = _norm(seller_username)
+    b = _strip_noise(b_raw)
+    if not a or not b:
+        return None, "insufficient identity"
+    if a == b:
+        return "exact", f"seller '{seller_username}' is source '{source_domain}'"
+    if b_raw.startswith(a) and len(a) >= MIN_CONTAINMENT:
+        return "suffix", (f"seller '{seller_username}' is source core "
+                          f"'{a}' plus a suffix")
+    short, long_ = (a, b) if len(a) <= len(b) else (b, a)
+    if len(short) >= MIN_CONTAINMENT and short in long_:
+        return "contains", (f"seller '{seller_username}' contains '{short}' "
+                            f"but leads with other tokens -- likely a "
+                            f"third-party reseller")
+    return None, "distinct"
+
+
 def is_self_comp(source_domain, seller_username):
     """
-    -> (bool, reason). True when the eBay seller is, by name, the source.
+    -> (bool, reason). True on any name relationship at all.
+
+    Deliberately the permissive end of `match_strength`: for comp filtering,
+    over-dropping is the safe error. Use `match_strength` directly when a
+    false positive would invent something.
 
     A lower bound on self-comping: proves presence, never absence.
     """
-    a = _strip_noise(_norm(source_domain))
-    b = _strip_noise(_norm(seller_username))
-    if not a or not b:
-        return False, "insufficient identity"
-    if a == b:
-        return True, f"seller '{seller_username}' is source '{source_domain}'"
-    short, long_ = (a, b) if len(a) <= len(b) else (b, a)
-    if len(short) >= MIN_CONTAINMENT and short in long_:
-        return True, (f"seller '{seller_username}' contains source core "
-                      f"'{short}'")
-    return False, "distinct"
+    strength, why = match_strength(source_domain, seller_username)
+    return strength is not None, why
 
 
 def strip_self_comps(items, source_domain):

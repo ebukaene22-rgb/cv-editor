@@ -61,7 +61,11 @@ party goods, so it is kept as a COLUMN (`brand_in_titles`), not a gate.
 ## What this cannot see
 
 Both probes key on the store's own name. A source selling on eBay under a
-handle unrelated to its domain is invisible to either. Calibration found a
+handle unrelated to its domain is invisible to either. In the other
+direction, a name match is not ownership: the first sweep credited
+`hidie_gymshark` -- a reseller stocking Gymshark -- to gymshark.com. Only
+`match_strength` 'exact'/'suffix' hits now count; 'contains' hits are
+recorded in `rejected_handles` instead. Calibration found a
 live example: reboxed.co.uk, a large UK refurbisher, resolves handles
 `reboxed` and `reboxedstore` but shows zero listings across 19 categories --
 so its real storefront is either named something else or was missed.
@@ -227,7 +231,7 @@ def probe_domain(api, domain, region, verbose=True):
     # --- 1. which candidate handles does eBay recognise? ------------------
     # A dropped-filter probe scans the whole category (~4.3s server-side), so
     # these run concurrently; eBay's quota is per-day, not per-second.
-    real, errors = [], 0
+    real, errors, rejected = [], 0, []
     with futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
         jobs = {pool.submit(seller_probe, api, core + suf, EXISTENCE_CAT,
                             mkt, 1): core + suf for suf in SUFFIXES}
@@ -248,9 +252,17 @@ def probe_domain(api, domain, region, verbose=True):
     else:
         for it in d.get("itemSummaries") or []:
             s = (it.get("seller") or {}).get("username")
-            if s and s.lower() not in {h.lower() for h in real} \
-                    and selfcomp.is_self_comp(domain, s)[0]:
+            if not s or s.lower() in {h.lower() for h in real}:
+                continue
+            # Only 'exact'/'suffix' may count as the source's own store.
+            # A 'contains' hit is normally a reseller leading with its own
+            # name ('hidie_gymshark'), and crediting its stock to the brand
+            # would invent presence rather than measure it.
+            strength, why = selfcomp.match_strength(domain, s)
+            if strength in ("exact", "suffix"):
                 real.append(s)
+            elif strength == "contains":
+                rejected.append(f"{s}({strength})")
 
     # --- 3. inventory + brand attribution for each real handle ------------
     total_listings, attributed, where, sample = 0, False, [], ""
@@ -287,6 +299,7 @@ def probe_domain(api, domain, region, verbose=True):
     row["errors"] = errors
 
     row["brand_in_titles"] = "yes" if attributed else "no"
+    row["rejected_handles"] = "|".join(rejected)
     row["handles"] = "|".join(real)
     row["listings"] = total_listings
     row["categories"] = ";".join(where[:6])
@@ -362,8 +375,8 @@ def main(argv=None):
             break
 
     cols = ["domain", "region", "brand_core", "marketplace", "present",
-            "brand_in_titles", "handles", "listings", "categories",
-            "errors", "sample_title", "notes"]
+            "brand_in_titles", "handles", "rejected_handles", "listings",
+            "categories", "errors", "sample_title", "notes"]
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols)
