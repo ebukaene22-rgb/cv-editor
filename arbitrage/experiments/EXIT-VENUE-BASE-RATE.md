@@ -61,19 +61,44 @@ not link. itinstock's only "ebay" strings are product image filenames
 (`product_13546_ebay_*.png`) — suggestive of a shared eBay/Shopify image
 pipeline, but no assertion of ownership.
 
-**Route 2, legal business identity.** UK/EU business sellers must publish
-trading name, address and company/VAT number on their listings; UK retailers
-publish the same on their terms pages. A match is conclusive. Source side
-already harvested:
+**Route 2, legal business identity** (`legalid.py`). eBay collects business
+details from business sellers and surfaces them through its
+business-details/profile infrastructure; Browse's **detailed item resource**
+(`getItem`) exposes them as `seller.sellerLegalInfo` -- name, registration
+number, VAT details, legal address. Ordinary search results do not carry it.
+
+Phrased that way on purpose: an earlier draft claimed "UK/EU law requires
+these details on the listing", which is too literal. Defensible is that eBay
+collects them and the detailed item resource exposes them.
+
+Evidence hierarchy, strongest first:
+
+| tier | evidence | verdict |
+|---|---|---|
+| `registration` | company number matches | **confirming** |
+| `vat` | VAT matches after normalisation | **confirming** |
+| `name_address` | legal name AND postcode match | strong, not confirming |
+| `name` | legal name alone | supporting only |
+| none | handle morphology, branded titles | candidate only |
+
+Names and addresses need fuzzy matching, and fuzzy matching invites exactly
+the false positives presence detection cannot afford — hence only the two
+numeric tiers promote a row to `confirmed_active`. Source side harvested:
 
     www.itinstock.com    company 12704142   VAT GB483890250
     www.tier1online.com  company 03708416
     reboxed.co.uk        none found on probed pages
 
-The eBay side is **untested** — the account was rate-limited. If Browse
-`getItem` exposes business seller legal info, `confirmed_active` becomes
-reachable. If it does not, both routes are closed and every active row stays
-`candidate_active` permanently, which is itself a result worth recording.
+The eBay side is **untested** — the account was rate-limited.
+
+A correction to an earlier version of this section, which said that if
+`getItem` does not expose the info then "both routes are closed and every
+active row stays candidate_active permanently". That is wrong, and it is this
+project's recurring failure shape a fifth time. The schema supports the
+field; a *particular seller* lacking it is `legal_info_unavailable` — an
+evidence state — not proof the route does not work. And because the fields are
+conditional, several listings must be sampled before concluding a field is
+absent for a seller at all. One bare item is not an unavailable field.
 
 ## Why the run stopped
 
@@ -91,10 +116,12 @@ renders as a confident negative.**
 | 2 | source's own listing used as a comp | "+£128 contribution" |
 | 3 | HTTP 429 on every probe | "not present in the exit venue" |
 | 4 | brand links no eBay store | "no eBay store" (route empty, not negative) |
+| 5 | one listing lacks `sellerLegalInfo` | "the identity route is closed" |
 
-Each was caught only by checking a known positive instead of trusting a
-clean-looking zero. The known-positive check is now mandatory before any
-output of this script is believed.
+The fifth was caught in review before it was built rather than after. The
+others were caught only by checking a known positive instead of trusting a
+clean-looking zero, and that check is now mandatory before any output of this
+script is believed.
 
 ## Outstanding
 
@@ -106,11 +133,16 @@ moft, materialkitchen, distilunion, shopbala) and **all four dealers**
 
 ## What would make this decisive
 
+Three independent discriminators, not one: dealer **incidence**, dealer
+**listing intensity**, and **legal-identity confirmation**.
+
 Calibration already showed both resolvable dealers active — itinstock 18,839
 listings, serverpartdeals 783 on EBAY_US. If that reproduces while DTC settles
 at 0–3 of 53 with at most 213 listings across all three candidates, the
 contrast is not merely incidence but **intensity**: itinstock alone would hold
-roughly 90x the listings of every active consumer brand combined.
+roughly 90x the listings of every active consumer brand combined. If
+itinstock's `sellerLegalInfo` also returns registration 12704142 or VAT
+GB483890250, that is the project's first confirmed positive on any axis.
 
 That would mean exit-venue contamination is a property of the **source
 class**, not of brands generally — and cause (C) narrows from "feed-reachable

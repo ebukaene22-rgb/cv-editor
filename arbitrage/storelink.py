@@ -48,20 +48,31 @@ pipeline but assert nothing about ownership.
 
 So confirmation leans on the second route below.
 
-## Route two: legal business identity
+## Route two: legal business identity (see legalid.py)
 
-UK/EU law requires business sellers to publish trading name, address and
-company/VAT number on their eBay listings, and UK retailers publish the same
-on their own terms pages. A match is genuine independent identity evidence.
-Harvested from the source side already:
+eBay collects business details from business sellers and surfaces them through
+its business-details/profile infrastructure; Browse's **detailed item
+resource** (`getItem`) exposes them as `seller.sellerLegalInfo`. Ordinary
+search results do not carry it.
+
+Stated that way deliberately. An earlier draft here said "UK/EU law requires
+business sellers to publish trading name, address and company/VAT number on
+their eBay listings" -- too literal. What is defensible is that eBay collects
+the details and the detailed item resource exposes them, not that every field
+is visibly embedded in every listing body.
+
+UK retailers publish the same identifiers on their own terms pages, so a match
+is genuine independent identity evidence. Harvested from the source side
+already:
 
     www.itinstock.com    company 12704142   VAT GB483890250
     www.tier1online.com  company 03708416
     reboxed.co.uk        none found on probed pages
 
-The eBay side (Browse getItem seller legal info) is untested -- the account
-was rate-limited when this was written. Until it is verified, NO handle can
-reach `confirmed`, and every active row stands at `candidate`.
+The eBay side is untested -- the account was rate-limited when this was
+written -- so no handle has reached `confirmed` yet. Note that a seller
+lacking the field yields `legal_info_unavailable`, an evidence state, and is
+never evidence the route itself is closed.
 """
 import gzip
 import re
