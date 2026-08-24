@@ -69,6 +69,15 @@ python3 scan.py mpn-audit --ebay-region US --limit 20 \
   --detail-limit 20 --min-market-listings 3
 ```
 
+The subsequent 16-row acquisition gate is recorded in
+`MPN-ECONOMICS-GATE.md`. All 16 eReplacementParts source rows failed the GBP 15
+threshold before shipping, fees, fulfilment, or returns; that retail source is
+closed for this cohort. Regenerate the machine-readable decision with:
+
+```bash
+python3 scan.py mpn-economics
+```
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

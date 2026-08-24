@@ -24,6 +24,25 @@ LEDGER_FIELDS = BASKET_FIELDS + [
     "p75_p25_ratio", "currency", "item_evidence_json",
 ]
 
+ECONOMICS_FIELDS = [
+    "cohort", "source_category", "brand", "mpn", "title", "source_url",
+    "source_verified_at", "source_price_usd", "source_stock",
+    "source_shipping_usd", "source_shipping_status",
+    "acquisition_floor_usd", "sold_median_usd", "sold_p25_usd",
+    "sold_count_90d", "sold_latest_date", "sold_evidence_status",
+    "active_coherent_depth", "active_p25_usd",
+    "conservative_exit_proxy_usd", "gross_spread_pre_cost_usd",
+    "usd_to_gbp", "gross_spread_pre_cost_gbp",
+    "gross_margin_pre_cost_pct", "net_contribution_upper_bound_gbp",
+    "expected_ebay_fee_usd",
+    "outbound_shipping_usd", "return_allowance_usd",
+    "net_contribution_gbp", "contribution_margin_pct",
+    "expected_monthly_unit_velocity", "expected_monthly_contribution_gbp",
+    "economics_status", "unresolved_inputs",
+]
+
+MIN_NET_CONTRIBUTION_GBP = 15.0
+
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
     "washer": "appliance", "dryer": "appliance",
@@ -182,4 +201,96 @@ def run_audit(ebay, basket_path, ledger_path, region="US", limit=20,
         "usable_rate_pct": 100 * usable / len(rows) if rows else 0,
         "median_coherent_depth": statistics.median(depths) if depths else 0,
         "passed": bool(rows) and usable / len(rows) >= 0.25,
+    }
+
+
+def _read_csv(path):
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt", newline="") as stream:
+        return list(csv.DictReader(stream))
+
+
+def run_economics_gate(source_path, resolution_path, out_path, usd_to_gbp):
+    """Apply the conservative pre-cost dominance gate to resolver survivors."""
+    if usd_to_gbp <= 0:
+        raise ValueError("USD-to-GBP rate must be positive")
+    source_rows = _read_csv(source_path)
+    resolution_rows = [row for row in _read_csv(resolution_path)
+                       if row.get("usable_market") == "1"]
+    source_by_id = {(row["brand"].casefold(), row["mpn"].casefold()): row
+                    for row in source_rows}
+    if len(source_by_id) != len(source_rows):
+        raise ValueError("source snapshot contains duplicate brand + MPN rows")
+    resolution_ids = {
+        (row["brand"].casefold(), row["mpn"].casefold())
+        for row in resolution_rows}
+    if set(source_by_id) != resolution_ids:
+        raise ValueError("source snapshot must exactly match resolver survivors")
+
+    output = []
+    for market in resolution_rows:
+        identity = (market["brand"].casefold(), market["mpn"].casefold())
+        source = source_by_id[identity]
+        source_price = float(source["source_price_usd"])
+        active_p25 = float(market["p25_price"])
+        gross_usd = active_p25 - source_price
+        gross_gbp = gross_usd * usd_to_gbp
+        margin_pct = (100 * gross_usd / active_p25
+                      if active_p25 else None)
+        rejected = gross_gbp < MIN_NET_CONTRIBUTION_GBP
+        status = ("REJECT_PRE_COST_SPREAD_BELOW_15_GBP" if rejected
+                  else "BLOCKED_FULL_ECONOMICS_REQUIRED")
+        unresolved = [
+            "exact_sold_rows", "sold_velocity", "source_shipping_quote",
+            "outbound_weight_and_postage", "ebay_us_seller_fee",
+            "return_allowance",
+        ]
+        output.append({
+            "cohort": market["cohort"],
+            "source_category": market["source_category"],
+            "brand": market["brand"], "mpn": market["mpn"],
+            "title": market["title"], "source_url": market["source_url"],
+            "source_verified_at": source["source_verified_at"],
+            "source_price_usd": f"{source_price:.2f}",
+            "source_stock": source["source_stock"],
+            "source_shipping_usd": source.get("source_shipping_usd", ""),
+            "source_shipping_status": source["source_shipping_status"],
+            "acquisition_floor_usd": f"{source_price:.2f}",
+            "sold_median_usd": "", "sold_p25_usd": "",
+            "sold_count_90d": "", "sold_latest_date": "",
+            "sold_evidence_status": "UNAVAILABLE_EBAY_AUTH_REQUIRED",
+            "active_coherent_depth": market["coherent_depth"],
+            "active_p25_usd": f"{active_p25:.2f}",
+            "conservative_exit_proxy_usd": f"{active_p25:.2f}",
+            "gross_spread_pre_cost_usd": f"{gross_usd:.2f}",
+            "usd_to_gbp": f"{usd_to_gbp:.5f}",
+            "gross_spread_pre_cost_gbp": f"{gross_gbp:.2f}",
+            "gross_margin_pre_cost_pct": (
+                f"{margin_pct:.2f}" if margin_pct is not None else ""),
+            "net_contribution_upper_bound_gbp": f"{gross_gbp:.2f}",
+            "expected_ebay_fee_usd": "", "outbound_shipping_usd": "",
+            "return_allowance_usd": "", "net_contribution_gbp": "",
+            "contribution_margin_pct": "",
+            "expected_monthly_unit_velocity": "",
+            "expected_monthly_contribution_gbp": "",
+            "economics_status": status,
+            "unresolved_inputs": ";".join(unresolved),
+        })
+    with open(out_path, "w", newline="") as stream:
+        writer = csv.DictWriter(
+            stream, fieldnames=ECONOMICS_FIELDS, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    rejected = sum(row["economics_status"].startswith("REJECT")
+                   for row in output)
+    appliance = [row for row in output if row["cohort"] == "appliance"]
+    tool = [row for row in output if row["cohort"] == "tool"]
+    return {
+        "rows": len(output), "rejected_pre_cost": rejected,
+        "cleared_for_full_economics": len(output) - rejected,
+        "appliance_cleared": sum(not row["economics_status"].startswith(
+            "REJECT") for row in appliance),
+        "tool_cleared": sum(not row["economics_status"].startswith(
+            "REJECT") for row in tool),
+        "precheck_passed": len(output) - rejected >= 4,
     }

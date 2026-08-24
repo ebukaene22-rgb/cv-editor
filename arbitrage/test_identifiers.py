@@ -176,6 +176,46 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(row["mpn"], "WD26X10013")
         self.assertEqual(row["source_category"], "dishwasher")
 
+    def test_mpn_economics_rejects_dominated_row_before_unknown_costs(self):
+        source_fields = ["brand", "mpn", "source_verified_at",
+                         "source_price_usd", "source_stock",
+                         "source_shipping_usd", "source_shipping_status"]
+        resolution_fields = [
+            "cohort", "source_category", "brand", "mpn", "title",
+            "source_url", "usable_market", "coherent_depth", "p25_price"]
+        with tempfile.TemporaryDirectory() as tmp:
+            source = os.path.join(tmp, "source.csv")
+            resolution = os.path.join(tmp, "resolution.csv.gz")
+            output = os.path.join(tmp, "economics.csv")
+            with open(source, "w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=source_fields)
+                writer.writeheader()
+                writer.writerow({
+                    "brand": "DeWalt", "mpn": "N097361",
+                    "source_verified_at": "2026-08-24T00:00:00Z",
+                    "source_price_usd": "8.73", "source_stock": "In Stock",
+                    "source_shipping_usd": "",
+                    "source_shipping_status": "ADDRESS_QUOTE_REQUIRED"})
+            with gzip.open(resolution, "wt", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=resolution_fields)
+                writer.writeheader()
+                writer.writerow({
+                    "cohort": "tool", "source_category": "angle-grinder",
+                    "brand": "DeWalt", "mpn": "N097361", "title": "Gear",
+                    "source_url": "https://source.test/n097361",
+                    "usable_market": "1", "coherent_depth": "3",
+                    "p25_price": "15.27"})
+            totals = MPN.run_economics_gate(
+                source, resolution, output, usd_to_gbp=0.73228)
+            with open(output, newline="") as stream:
+                row = next(csv.DictReader(stream))
+        self.assertEqual(totals["rejected_pre_cost"], 1)
+        self.assertFalse(totals["precheck_passed"])
+        self.assertEqual(row["gross_spread_pre_cost_usd"], "6.54")
+        self.assertEqual(row["net_contribution_upper_bound_gbp"], "4.79")
+        self.assertEqual(row["economics_status"],
+                         "REJECT_PRE_COST_SPREAD_BELOW_15_GBP")
+
     def test_gtin_lookup_batches_details_and_requires_coherence(self):
         client = comp.EbayComp(self.conn, synthetic=True)
         calls = []

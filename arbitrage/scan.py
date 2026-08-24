@@ -487,6 +487,26 @@ def cmd_mpn_audit(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_mpn_economics(args):
+    """Apply the frozen 16-row conservative acquisition economics gate."""
+    import mpn as M
+    conn = db()
+    rate = args.usd_to_gbp or fx_rates(conn).get("GBP")
+    if not rate:
+        sys.exit("USD-to-GBP rate unavailable; pass --usd-to-gbp")
+    totals = M.run_economics_gate(
+        args.source, args.resolution, args.out, rate)
+    verdict = ("ADVANCE_FULL_ECONOMICS" if totals["precheck_passed"]
+               else "KILL_SOURCE")
+    print(f"economics cohort: {totals['rows']} resolver survivors")
+    print(f"pre-cost rejects: {totals['rejected_pre_cost']}; "
+          f"cleared for full economics: {totals['cleared_for_full_economics']}")
+    print(f"appliance cleared: {totals['appliance_cleared']}; "
+          f"tool cleared: {totals['tool_cleared']}")
+    print(f"four-SKU £15 contribution gate: {verdict}")
+    print(f"evidence -> {args.out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -735,6 +755,14 @@ def main():
     ma.add_argument("--detail-limit", type=int, default=20)
     ma.add_argument("--min-market-listings", type=int, default=3)
     ma.set_defaults(fn=cmd_mpn_audit)
+    me = sub.add_parser("mpn-economics")
+    me.add_argument("--source",
+                    default="experiments/mpn-source-snapshot.csv")
+    me.add_argument("--resolution",
+                    default="experiments/mpn-resolution-ledger.csv.gz")
+    me.add_argument("--out", default="experiments/mpn-economics-ledger.csv")
+    me.add_argument("--usd-to-gbp", type=float)
+    me.set_defaults(fn=cmd_mpn_economics)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

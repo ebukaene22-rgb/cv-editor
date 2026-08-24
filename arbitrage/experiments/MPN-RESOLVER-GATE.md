@@ -51,6 +51,12 @@ depth remains one across the full basket, and usable identities show meaningful
 price dispersion. Source prices, stock, shipping, fees, condition-adjusted sold
 evidence, and turnover must be measured before any item becomes actionable.
 
+The subsequent acquisition test is now complete. As documented in
+`MPN-ECONOMICS-GATE.md`, all 16 resolver survivors fail the GBP 15 threshold
+before costs when eReplacementParts retail price is compared with the exact
+active-market p25. The resolver mechanism remains valid, but this acquisition
+source is closed.
+
 ## Evidence
 
 - `mpn-basket.csv`: the frozen 50-identity source basket.
