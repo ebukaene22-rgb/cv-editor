@@ -73,6 +73,34 @@ deterministic source-to-eBay-GB market at the preregistered depth. Bundle
 monetisation remains blocked; unconfirmed search hits must not be promoted to
 exact identity.
 
+## Controlled eBay US falsification
+
+The same frozen 100-GTIN set was then run unchanged against `EBAY_US`. The
+sample checksum was
+`959d24df035455731d9c1b7f6897334e045c1037b717227834123202e76dba99`;
+no identifiers, thresholds, conditions, or coherence rules were tuned.
+
+| Measure | eBay GB | eBay US |
+| --- | ---: | ---: |
+| GTIN queries with active results | 7 / 100 | 14 / 100 |
+| GTINs with any explicit exact confirmation | 2 / 100 | 9 / 100 |
+| GTINs coherent across all returned listings | 1 / 100 | 5 / 100 |
+| GTINs with at least 3 coherent listings | 0 / 100 | 0 / 100 |
+| Median active listings among resolved queries | 1 | 1 |
+| Active-listing range | 1-2 | 1-4 |
+
+The US statuses were 86 `NOT_FOUND`, five `UNCONFIRMED`, four `AMBIGUOUS`,
+and five `EXACT_SHALLOW`. All 20 returned US listings were inspected and no API
+errors remained. The only GTIN with four active listings was ambiguous across
+model/category, so higher raw depth did not create a deterministic market.
+
+**Decision: broad GTIN-to-eBay resolution is FAILED for this source universe.**
+The US market improves search and exact-confirmation rates, but still produces
+zero GTINs at the required coherent depth. Stop further broad eBay GTIN
+architecture and keep bundle monetisation blocked. Exact-MPN replacement parts
+remain a separate hypothesis because the part/model identifier is native to
+how that market is searched and listed.
+
 ## Evidence
 
 - `identity-coverage.csv`: store and category aggregates, including failures,
@@ -82,7 +110,11 @@ exact identity.
 - `identifier-collisions.csv`: manual classification of within-store source
   collisions and the encoded handling decision.
 - `ebay-resolution-ledger.csv.gz`: one row per inspected eBay item when the
-  credentialed resolver is enabled.
+  credentialed GB resolver is enabled.
+- `ebay-us-resolution-ledger.csv.gz`: the same frozen GTIN sample resolved on
+  eBay US under identical criteria.
+- `ebay-market-comparison.csv`: one row per frozen GTIN with source context and
+  side-by-side GB/US outcomes.
 
 The sample is stable: products are ranked by a hash of domain and product URL,
 then the first five per store are selected. Rebuilding from a newer observation

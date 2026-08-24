@@ -43,6 +43,10 @@ denied. It writes inspected listing evidence to
 confirmation with synthetic data. When `--max-ebay-lookups` bounds the run,
 eligible GTINs are selected by stable hash rather than numeric order.
 
+The frozen 100-GTIN GB/US falsification result is recorded in
+`IDENTITY-AUDIT.md`; `ebay-market-comparison.csv` contains the side-by-side
+market outcomes. Both markets failed the three-coherent-listing usability gate.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a
