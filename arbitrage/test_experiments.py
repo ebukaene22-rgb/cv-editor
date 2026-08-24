@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import experiments as E
 import scan
 import signals as S
+import unitfloor
 
 
 class ExperimentTests(unittest.TestCase):
@@ -48,7 +49,10 @@ class ExperimentTests(unittest.TestCase):
 
     def test_condition_and_bundle_cohorts_are_explicit(self):
         ts = "2026-01-01T00:00:00Z"
-        self.add(ts, "shop.test", "OB-1", 1, title="Camera OPEN BOX")
+        self.add(ts, "shop.test", "OB-1", 1, price=60, compare=100,
+                 title="Camera OPEN BOX")
+        self.add(ts, "shop.test", "LOW-1", 1, price=10, compare=20,
+                 title="Cable OPEN BOX")
         self.add(ts, "shop.test", "KIT-1", 1, title="Coffee Starter Kit")
         rates = {"USD": 1.0, "GBP": 0.8}
         with tempfile.TemporaryDirectory() as tmp:
@@ -61,6 +65,8 @@ class ExperimentTests(unittest.TestCase):
             with open(openbox, newline="") as f:
                 row = next(csv.DictReader(f))
             self.assertEqual(row["source_condition"], "open_box")
+            self.assertEqual(row["unit_value_gate"], "PASS_PROXY_ONLY")
+            self.assertEqual(row["exit_value_proxy_gbp"], "80.00")
             self.assertIn("condition_match", row)
             with open(bundles, newline="") as f:
                 row = next(csv.DictReader(f))
@@ -86,6 +92,15 @@ class ExperimentTests(unittest.TestCase):
         self.assertAlmostEqual(result["expected_revenue_gbp"], 480)
         self.assertAlmostEqual(result["expected_contribution_gbp"], 238)
         self.assertEqual(result["largest_uncertain_profit_share_pct"], 0)
+
+    def test_unit_floor_is_explicitly_acquisition_ratio_dependent(self):
+        baseline = unitfloor.floor_exit_price(
+            target_cm=15, ship=5, buy_to_exit=0.40)
+        cheaper_source = unitfloor.floor_exit_price(
+            target_cm=15, ship=5, buy_to_exit=0.20)
+        self.assertGreater(baseline, 45)
+        self.assertLess(baseline, 60)
+        self.assertLess(cheaper_source, baseline)
 
 
 if __name__ == "__main__":

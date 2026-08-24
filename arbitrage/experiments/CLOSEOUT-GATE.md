@@ -122,17 +122,26 @@ They failed on a third cause, **(C) the comp is the source**, which had been
 invisible in every prior cohort because every prior cohort returned zero
 PASSes. Causes (A) and (B) were killing rows before (C) could show itself.
 
-Cause (C) has a nasty property the other two lack: it is *selected for* by the
-same thing that makes a source machine-readable. A dealer with a clean product
-feed and stable MPNs is a dealer with the operational maturity to run an eBay
-store — so the better the source looks to the scanner, the more likely it is
-already occupying the exit venue. Machine-accessible supply and independent
-demand are anti-correlated, and (B) and (C) are two faces of that.
+Cause (C) may be *selected for* by the same thing that makes a source
+machine-readable: a dealer with a clean product feed and stable MPNs has the
+operational maturity to run an eBay store. If so, the better a source looks to
+the scanner, the more likely it already occupies the exit venue, and (B) and
+(C) share a root.
 
-**Falsifiable prediction, for the next mechanism tested:** any source whose
+Stated as a hypothesis rather than a finding, because the evidence is thin in
+a specific way: **22 of the 30 rows, and all nine self-comps, are itinstock.**
+This cohort establishes that one dual-channel dealer can manufacture ten
+false PASSes. It does not establish how common dual-channel dealers are.
+
+**Cheap next measurement:** resolve each of the 69 stores in `stores.txt`
+against its own eBay handle and count SKU overlap. That gives a base rate
+directly, without spending another cohort.
+
+**Falsifiable prediction, for the next mechanism tested:** a source whose
 catalogue is clean enough to resolve by identifier will already be present in
-the exit venue for the same SKUs. A mechanism survives only if it sources from
-somewhere structurally barred from the exit venue — not merely absent from it.
+the exit venue for a material share of the same SKUs. A mechanism is more
+likely to survive if it sources from somewhere structurally barred from the
+exit venue — not merely absent from it.
 
 ## Reproduce
 
