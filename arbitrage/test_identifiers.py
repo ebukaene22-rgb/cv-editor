@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import comp
 import identifiers as ID
+import mpn as MPN
 import scan
 
 
@@ -116,6 +117,64 @@ class IdentifierTests(unittest.TestCase):
         client = comp.EbayComp(self.conn, synthetic=True)
         with self.assertRaises(RuntimeError):
             client.lookup_gtin("847974010426")
+
+    def test_unknown_ebay_marketplace_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "unsupported eBay region"):
+            comp.marketplace_id("AE")
+
+    def test_mpn_lookup_requires_exact_brand_and_mpn_with_depth(self):
+        client = comp.EbayComp(self.conn, synthetic=True)
+
+        def browse(url, marketplace):
+            if "item_summary" in url:
+                return {"total": 4, "itemSummaries": [
+                    {"itemId": f"v1|{index}|0"} for index in range(4)]}
+            return {"items": [
+                {"itemId": "v1|1|0", "title": "Pump", "brand": "GE",
+                 "mpn": "WD26X10013", "condition": "New",
+                 "price": {"value": "40", "currency": "USD"}},
+                {"itemId": "v1|2|0", "title": "Pump", "brand": "General Electric",
+                 "mpn": "WD26-X10013", "condition": "New",
+                 "price": {"value": "50", "currency": "USD"}},
+                {"itemId": "v1|3|0", "title": "Pump", "brand": "GE",
+                 "mpn": "WD26X10013", "condition": "New",
+                 "price": {"value": "60", "currency": "USD"}},
+                {"itemId": "v1|4|0", "title": "Wrong", "brand": "Other",
+                 "mpn": "WD26X10013", "condition": "New",
+                 "price": {"value": "10", "currency": "USD"}},
+            ]}
+
+        client._browse_json = browse
+        result = client._live_mpn(
+            "General Electric", "WD26X10013", "EBAY_US", 20, 20, 3)
+        self.assertEqual(result["exact_mpn_items"], 4)
+        self.assertEqual(result["exact_brand_mpn_items"], 3)
+        self.assertEqual(result["coherent_depth"], 3)
+        self.assertTrue(result["usable_market"])
+        self.assertEqual(result["median"], 50)
+
+    def test_mpn_depth_excludes_secondary_condition_items(self):
+        details = [
+            {"brand": "DeWalt", "mpn": "N039404", "condition": "New",
+             "pack": "", "lot_size": "", "price": 20, "currency": "USD"},
+            {"brand": "DeWalt", "mpn": "N039404", "condition": "Open box",
+             "pack": "", "lot_size": "", "price": 5, "currency": "USD"},
+        ]
+        result = comp.EbayComp._classify_mpn_result(
+            "DeWalt", "N039404", details, 2, 2, False, 2)
+        self.assertEqual(result["exact_brand_mpn_items"], 2)
+        self.assertEqual(result["coherent_depth"], 1)
+        self.assertFalse(result["usable_market"])
+        self.assertEqual(result["median"], 20)
+
+    def test_mpn_basket_parser_uses_structured_url_suffix(self):
+        row = MPN._parse_candidate(
+            "https://www.ereplacementparts.com/parts/dishwasher/"
+            "general-electric/erp260801/motor-and-pump-kit-wd26x10013/",
+            "2026-08-15")
+        self.assertEqual(row["brand"], "General Electric")
+        self.assertEqual(row["mpn"], "WD26X10013")
+        self.assertEqual(row["source_category"], "dishwasher")
 
     def test_gtin_lookup_batches_details_and_requires_coherence(self):
         client = comp.EbayComp(self.conn, synthetic=True)

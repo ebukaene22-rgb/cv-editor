@@ -47,6 +47,28 @@ The frozen 100-GTIN GB/US falsification result is recorded in
 `IDENTITY-AUDIT.md`; `ebay-market-comparison.csv` contains the side-by-side
 market outcomes. Both markets failed the three-coherent-listing usability gate.
 
+## Exact-MPN replacement parts
+
+`mpn-basket.csv` freezes a category-balanced 50-item replacement-parts cohort;
+`mpn-resolution-ledger.csv.gz` records the live eBay US item-detail evidence.
+Read `MPN-RESOLVER-GATE.md` for the pre-registered rules and result. The exact
+brand + MPN resolver passed at 16/50 usable markets (32%) against a 25% gate,
+so the mechanism advances to acquisition and margin testing. It is not a buy
+list.
+
+Rebuild a new, separately dated basket from a downloaded source sitemap with:
+
+```bash
+python3 scan.py mpn-basket SOURCE-SITEMAP.xml.gz -n 50
+```
+
+Run the live resolver with credentials set:
+
+```bash
+python3 scan.py mpn-audit --ebay-region US --limit 20 \
+  --detail-limit 20 --min-market-listings 3
+```
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

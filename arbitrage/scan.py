@@ -454,6 +454,39 @@ def cmd_identity_audit(args):
         print(f"eBay evidence -> {args.ebay_ledger_out}")
 
 
+def cmd_mpn_basket(args):
+    """Freeze a deterministic exact-MPN cohort from a source sitemap."""
+    import mpn as M
+    rows = M.build_basket(args.sitemap, args.out, args.n)
+    print(f"exact-MPN basket: {len(rows)} rows -> {args.out}")
+    print(f"basket sha256: {M.basket_checksum(args.out)}")
+
+
+def cmd_mpn_audit(args):
+    """Run the pre-registered exact brand + MPN eBay resolver gate."""
+    import comp as C
+    import mpn as M
+    conn = db()
+    ebay = C.EbayComp(conn)
+    if ebay.synthetic:
+        sys.exit("mpn-audit requires EBAY_CLIENT_ID and EBAY_CLIENT_SECRET")
+    totals = M.run_audit(
+        ebay, args.basket, args.out, region=args.ebay_region,
+        limit=args.limit, detail_limit=args.detail_limit,
+        min_market_listings=args.min_market_listings)
+    verdict = "PASS" if totals["passed"] else "KILL"
+    print(f"basket: {totals['basket_rows']} frozen identities; "
+          f"sha256 {totals['basket_checksum']}")
+    print(f"active: {totals['active_queries']}/{totals['basket_rows']}; "
+          f"exact brand+MPN: {totals['exact_identities']}/"
+          f"{totals['basket_rows']}; usable depth: "
+          f"{totals['usable_markets']}/{totals['basket_rows']} "
+          f"({totals['usable_rate_pct']:.2f}%)")
+    print(f"median coherent depth: {totals['median_coherent_depth']}; "
+          f"pre-registered 25% gate: {verdict}")
+    print(f"evidence -> {args.out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -689,6 +722,19 @@ def main():
     ia.add_argument("--ebay-ledger-out",
                     default="experiments/ebay-resolution-ledger.csv.gz")
     ia.set_defaults(fn=cmd_identity_audit)
+    mb = sub.add_parser("mpn-basket")
+    mb.add_argument("sitemap")
+    mb.add_argument("-n", type=int, default=50)
+    mb.add_argument("--out", default="experiments/mpn-basket.csv")
+    mb.set_defaults(fn=cmd_mpn_basket)
+    ma = sub.add_parser("mpn-audit")
+    ma.add_argument("--basket", default="experiments/mpn-basket.csv")
+    ma.add_argument("--out", default="experiments/mpn-resolution-ledger.csv.gz")
+    ma.add_argument("--ebay-region", default="US")
+    ma.add_argument("--limit", type=int, default=20)
+    ma.add_argument("--detail-limit", type=int, default=20)
+    ma.add_argument("--min-market-listings", type=int, default=3)
+    ma.set_defaults(fn=cmd_mpn_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")
