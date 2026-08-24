@@ -1,5 +1,6 @@
 import csv
 import gzip
+import json
 import os
 import sqlite3
 import sys
@@ -209,6 +210,19 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(result["searches"], 6)
         self.assertEqual(result["matched_identities"], 3)
         self.assertTrue(result["source_gate_passed"])
+
+    def test_direct_liquidation_parser_reads_structured_manifest(self):
+        state = {"__SSR_STATE__": {"single-product": {"product": {
+            "masterSku": "LOT1", "price": 100, "units": 2,
+            "products": [{"manufacturer": "Whirlpool", "model": "A1",
+                          "condition": "Used", "quantity": 2,
+                          "retailPrice": 50}],
+        }}}}
+        html = ("<html><script>window.__INITIAL_STATE__ = " +
+                json.dumps(state) + ";</script></html>")
+        product = MPN.parse_direct_liquidation_page(html)
+        self.assertEqual(product["masterSku"], "LOT1")
+        self.assertEqual(product["products"][0]["model"], "A1")
 
     def test_mpn_basket_parser_uses_structured_url_suffix(self):
         row = MPN._parse_candidate(

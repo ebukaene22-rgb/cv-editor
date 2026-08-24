@@ -89,15 +89,25 @@ python3 scan.py mpn-source-audit
 Outputs `mpn-used-source-ledger.csv`; methodology and the frozen result are in
 `MPN-USED-SOURCE-GATE.md`.
 
-The next source-class check covers public manifested-liquidation inventory on
-B-Stock and Direct Liquidation. Recompute its frozen coverage decision with:
+The public title-search snapshot on B-Stock and Direct Liquidation is retained
+as a discovery screen only. Recompute its summary with:
 
 ```bash
 python3 scan.py mpn-liquidation-coverage
 ```
 
-The 32-search snapshot is in `mpn-liquidation-coverage.csv`; interpretation and
-scope are recorded in `MPN-LIQUIDATION-COVERAGE-GATE.md`.
+The 32-search snapshot is in `mpn-liquidation-coverage.csv`; its corrected
+scope is recorded in `MPN-LIQUIDATION-COVERAGE-GATE.md`.
+
+Audit real Direct Liquidation product manifests against the frozen MPN set:
+
+```bash
+python3 scan.py mpn-manifest-audit LOT_URL [LOT_URL ...]
+```
+
+This parses structured line-level manufacturer, model, condition, UPC,
+quantity, and price fields. The current two-lot result and sample-size rule are
+in `MPN-MANIFEST-GATE.md`; evidence is in `mpn-manifest-ledger.csv`.
 
 ## Open box and refurbished
 

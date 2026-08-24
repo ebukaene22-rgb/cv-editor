@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 
 
 BASKET_FIELDS = [
@@ -64,6 +65,14 @@ SOURCE_CONDITIONS = {
     "Certified Refurbished": "certified_refurbished",
     "Used Part - A Condition Grade": "used",
 }
+
+MANIFEST_FIELDS = [
+    "source", "lot_id", "lot_url", "lot_ask_price_usd", "lot_units",
+    "lot_condition", "manifest_accuracy_risk_pct", "line_manufacturer",
+    "line_model", "line_condition", "line_upc", "line_quantity",
+    "line_retail_price_usd", "frozen_brand", "frozen_mpn",
+    "identity_status", "audited_at",
+]
 
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
@@ -444,7 +453,7 @@ def run_used_source_audit(ebay, resolution_path, out_path, usd_to_gbp,
 
 
 def run_liquidation_coverage_gate(coverage_path, resolution_path):
-    """Validate exact-search coverage snapshots for liquidation marketplaces."""
+    """Validate title-search snapshots; this is not a manifest-content gate."""
     demand = [row for row in _read_csv(resolution_path)
               if row.get("usable_market") == "1"]
     demand_ids = {row["mpn"].casefold() for row in demand}
@@ -462,4 +471,107 @@ def run_liquidation_coverage_gate(coverage_path, resolution_path):
         "demand_rows": len(demand), "sources": len(sources),
         "searches": len(coverage), "matched_identities": len(matched_ids),
         "source_gate_passed": len(matched_ids) >= 3,
+    }
+
+
+class _ScriptCollector(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_script = False
+        self.scripts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.casefold() == "script":
+            self.in_script = True
+            self.scripts.append("")
+
+    def handle_endtag(self, tag):
+        if tag.casefold() == "script":
+            self.in_script = False
+
+    def handle_data(self, data):
+        if self.in_script:
+            self.scripts[-1] += data
+
+
+def parse_direct_liquidation_page(html):
+    """Extract the structured lot and line-level manifest from a product page."""
+    marker = "window.__INITIAL_STATE__ = "
+    parser = _ScriptCollector()
+    parser.feed(html)
+    script = next((item for item in parser.scripts if marker in item), None)
+    if script is None:
+        raise ValueError("Direct Liquidation page has no initial state")
+    state = json.JSONDecoder().raw_decode(script.split(marker, 1)[1])[0]
+    product = (state.get("__SSR_STATE__", {}).get("single-product", {})
+               .get("product"))
+    if not product or not isinstance(product.get("products"), list):
+        raise ValueError("Direct Liquidation page has no line-level manifest")
+    return product
+
+
+def _fetch_text(url, timeout=30):
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0", "Accept": "text/html",
+    })
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8", "replace")
+
+
+def run_manifest_audit(urls, resolution_path, out_path, timeout=30):
+    """Match real line-level liquidation manifests to the frozen MPN set."""
+    demand = [row for row in _read_csv(resolution_path)
+              if row.get("usable_market") == "1"]
+    demand_by_mpn = {_canonical_text(row["mpn"]): row for row in demand}
+    audited_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    output = []
+    lot_ids = set()
+    exact_ids = set()
+    for url in urls:
+        lot = parse_direct_liquidation_page(_fetch_text(url, timeout))
+        lot_id = str(lot.get("masterSku") or lot.get("sku") or "")
+        if not lot_id or lot_id in lot_ids:
+            raise ValueError("manifest lots require unique lot IDs")
+        lot_ids.add(lot_id)
+        for line in lot["products"]:
+            model = _canonical_text(line.get("model"))
+            frozen = demand_by_mpn.get(model)
+            if not frozen:
+                status = "NOT_IN_FROZEN_UNIVERSE"
+            else:
+                brand_rule = source_brand_match(
+                    frozen["brand"], line.get("manufacturer"))
+                status = ("EXACT_FROZEN_MPN" if brand_rule
+                          else "MPN_BRAND_MISMATCH")
+                if brand_rule:
+                    exact_ids.add(model)
+            output.append({
+                "source": "Direct Liquidation", "lot_id": lot_id,
+                "lot_url": url,
+                "lot_ask_price_usd": f"{float(lot.get('price') or 0):.2f}",
+                "lot_units": lot.get("units") or "",
+                "lot_condition": lot.get("condition") or "",
+                "manifest_accuracy_risk_pct": "15",
+                "line_manufacturer": line.get("manufacturer") or "",
+                "line_model": line.get("model") or "",
+                "line_condition": line.get("condition") or "",
+                "line_upc": line.get("upc") or "",
+                "line_quantity": line.get("quantity") or "",
+                "line_retail_price_usd": (
+                    f"{float(line.get('retailPrice') or 0):.2f}"),
+                "frozen_brand": frozen["brand"] if frozen else "",
+                "frozen_mpn": frozen["mpn"] if frozen else "",
+                "identity_status": status, "audited_at": audited_at,
+            })
+    with open(out_path, "w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=MANIFEST_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    return {
+        "lots": len(lot_ids), "manifest_lines": len(output),
+        "manifest_units": sum(int(row["line_quantity"]) for row in output),
+        "matched_identities": len(exact_ids),
+        "coverage_gate_passed": len(exact_ids) >= 3,
+        "sample_sufficient": len(lot_ids) >= 10,
     }

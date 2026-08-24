@@ -1,16 +1,15 @@
-# Exact-MPN public liquidation coverage gate
+# Exact-MPN public liquidation title-search screen
 
 Audit time: 2026-08-24 11:10 UTC  
 Demand universe: the same 16 exact-MPN eBay resolver survivors  
 Sources: B-Stock and Direct Liquidation public live-inventory searches
 
-## Gate
+## Scope
 
-The source class advances to manifest underwriting only if at least three
-frozen MPNs appear in currently available lots. Exact search results are only
-a coverage signal: any positive lot would still require a downloadable
-manifest, exact line-level identity, condition, quantity, landed cost, and
-condition-matched exit economics before it could be viable.
+This was a discovery screen, not a manifest-content test. Marketplace title
+search may not index the models inside an attached lot manifest. Zero search
+results therefore cannot close manifested liquidation or establish that a
+frozen MPN is absent from available lots.
 
 ## Result
 
@@ -29,16 +28,13 @@ Direct Liquidation describes its inventory as customer returns, overstock, and
 end-of-life products and exposes public current-inventory search. It also
 returned zero for all 16 exact MPNs.
 
-## Decision
+## Corrected decision
 
-**NO_PUBLIC_COVERAGE: do not build manifest economics for this frozen set.**
+**TITLE_SEARCH_INCONCLUSIVE.**
 
-This result does not prove that manifested liquidation is commercially dead.
-It proves that broad public liquidation marketplaces do not currently provide
-repeatable acquisition coverage for the already-resolved demand universe. A
-future test should run only when a specific dealer, liquidator, or private feed
-provides an actual line-level appliance-parts manifest. That manifest should
-be checked against the same frozen MPNs before any bidding or account work.
+The result only says the frozen identifiers did not appear in public lot
+titles. The valid experiment is the line-level audit now recorded in
+`MPN-MANIFEST-GATE.md` and `mpn-manifest-ledger.csv`.
 
 ## Evidence
 
@@ -49,7 +45,7 @@ be checked against the same frozen MPNs before any bidding or account work.
 - Direct Liquidation:
   <https://www.directliquidation.com/>
 
-Recompute the frozen decision from the evidence snapshot:
+Recompute the title-search summary from the evidence snapshot:
 
 ```bash
 python3 scan.py mpn-liquidation-coverage

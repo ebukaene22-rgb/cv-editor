@@ -533,14 +533,32 @@ def cmd_mpn_source_audit(args):
 
 
 def cmd_mpn_liquidation_coverage(args):
-    """Apply the frozen-universe coverage gate to liquidation search evidence."""
+    """Summarize title-search discovery evidence, not manifest contents."""
     import mpn as M
     totals = M.run_liquidation_coverage_gate(args.coverage, args.resolution)
-    verdict = "ADVANCE_MANIFEST_REVIEW" if totals["source_gate_passed"] else "NO_PUBLIC_COVERAGE"
-    print(f"liquidation coverage: {totals['searches']} exact searches across "
+    verdict = "TITLE_MATCHES_FOUND" if totals["source_gate_passed"] else "TITLE_SEARCH_INCONCLUSIVE"
+    print(f"liquidation title-search screen: {totals['searches']} searches across "
           f"{totals['sources']} sources")
     print(f"matched frozen identities: {totals['matched_identities']}/"
           f"{totals['demand_rows']}; three-SKU gate: {verdict}")
+
+
+def cmd_mpn_manifest_audit(args):
+    """Audit real line-level liquidation manifests against frozen MPNs."""
+    import mpn as M
+    totals = M.run_manifest_audit(
+        args.urls, args.resolution, args.out, timeout=args.timeout)
+    if not totals["sample_sufficient"]:
+        verdict = "INSUFFICIENT_MANIFEST_SAMPLE"
+    elif totals["coverage_gate_passed"]:
+        verdict = "ADVANCE_LOT_ECONOMICS"
+    else:
+        verdict = "KILL_LIQUIDATION_COVERAGE"
+    print(f"manifest audit: {totals['lots']} lots, "
+          f"{totals['manifest_lines']} lines, {totals['manifest_units']} units")
+    print(f"matched frozen identities: {totals['matched_identities']}; "
+          f"verdict: {verdict}")
+    print(f"evidence -> {args.out}")
 
 
 def cmd_openbox_cohort(args):
@@ -814,6 +832,13 @@ def main():
     ml.add_argument("--resolution",
                     default="experiments/mpn-resolution-ledger.csv.gz")
     ml.set_defaults(fn=cmd_mpn_liquidation_coverage)
+    mm = sub.add_parser("mpn-manifest-audit")
+    mm.add_argument("urls", nargs="+")
+    mm.add_argument("--resolution",
+                    default="experiments/mpn-resolution-ledger.csv.gz")
+    mm.add_argument("--out", default="experiments/mpn-manifest-ledger.csv")
+    mm.add_argument("--timeout", type=int, default=30)
+    mm.set_defaults(fn=cmd_mpn_manifest_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")
