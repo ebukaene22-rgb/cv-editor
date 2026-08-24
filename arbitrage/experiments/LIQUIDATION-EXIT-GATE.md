@@ -30,20 +30,18 @@ All 80 eBay Browse API queries returned `NOT_FOUND` before item-detail
 verification. There is therefore no deterministic active exit price, coherent
 market depth, or candidate that can advance to sold velocity or lot economics.
 
-## Decision
+## Superseded decision
 
-**KILL_EXIT_RESOLUTION: liquidation GTIN -> condition-matched eBay US.**
+**DIAGNOSE_RESOLVER.**
 
-Buyer premium, freight, tax, eBay fees, outbound postage, sellable-rate
-assumptions, and the mandatory 15% manifest-accuracy haircut were not estimated.
-Those costs can only worsen a row and cannot rescue a missing exit market.
+This first pass accidentally coupled GTIN retrieval to category-specific
+condition IDs. It did not include a genuinely unfiltered control and therefore
+could not distinguish a missing market from sparse seller-supplied GTIN data or
+condition-filter semantics. Its evidence is retained, but its kill verdict is
+withdrawn.
 
-This materially downgrades liquidation for the GBP 500/month target. The
-source provides excellent structured identity, but eBay does not expose a
-condition-matched GTIN market for this inventory. A future liquidation test
-would need a different deterministic exit resolver, or a pre-registered exact
-model-number architecture; rerunning GTIN against eBay with looser identity or
-condition rules is closed.
+The four-pass automated decomposition and corrected conclusion are recorded in
+`LIQUIDATION-RESOLVER-DIAGNOSTIC.md`.
 
 ## Evidence
 

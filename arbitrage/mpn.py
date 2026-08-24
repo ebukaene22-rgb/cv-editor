@@ -84,6 +84,20 @@ LIQUIDATION_EXIT_FIELDS = [
     "p75_price", "currency", "economics_status", "unresolved_inputs",
 ]
 
+RESOLVER_DIAGNOSTIC_FIELDS = [
+    "model", "manufacturer", "gtin", "source_conditions",
+    "specific_condition", "broad_condition", "audited_at", "ebay_region",
+    "gtin_unfiltered_count", "gtin_condition_count",
+    "model_unfiltered_count", "model_condition_count",
+    "gtin_unfiltered_exact_depth", "gtin_condition_exact_depth",
+    "model_unfiltered_exact_depth", "model_condition_exact_depth",
+    "gtin_unfiltered_status", "gtin_condition_status",
+    "model_unfiltered_status", "model_condition_status",
+    "dominant_category_id", "returned_condition_ids",
+    "returned_titles_json", "diagnostic_classification",
+    "deterministic_market_found",
+]
+
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
     "washer": "appliance", "dryer": "appliance",
@@ -653,4 +667,115 @@ def run_liquidation_exit_audit(ebay, universe_path, out_path, region="US",
         "identities": len(output), "usable_markets": usable,
         "usable_rate_pct": 100 * usable / len(output) if output else 0,
         "advance_economics": usable >= 3,
+    }
+
+
+def _diagnostic_items(result):
+    return (result or {}).get("items", []) or []
+
+
+def _diagnostic_count(result):
+    return int((result or {}).get("n", 0))
+
+
+def _diagnostic_depth(result):
+    return int((result or {}).get("coherent_depth", 0))
+
+
+def _diagnostic_status(result):
+    return (result or {}).get("resolution_status", "API_ERROR")
+
+
+def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
+                                        region="US", min_market_listings=3):
+    """Decompose GTIN, model, and condition effects over the frozen universe."""
+    universe = [row for row in _read_csv(universe_path)
+                if row.get("valid_gtins")]
+    audited_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    output = []
+    for row in universe:
+        gtin = min(row["valid_gtins"].split(";"),
+                   key=lambda value: (len(value), value))
+        specific = _liquidation_condition_family(row["conditions"])
+        broad = "broad_new" if specific == "open_box" else "broad_used"
+        kwargs = {"region": region, "limit": 10, "detail_limit": 5,
+                  "min_market_listings": min_market_listings}
+        pass_a = ebay.lookup_gtin(gtin, condition=None, **kwargs)
+        pass_b = ebay.lookup_gtin(gtin, condition=broad, **kwargs)
+        pass_c = ebay.lookup_model(
+            row["manufacturers"], row["model"], condition=None, **kwargs)
+        pass_d = ebay.lookup_model(
+            row["manufacturers"], row["model"], condition=specific, **kwargs)
+        all_items = []
+        for result in (pass_a, pass_b, pass_c, pass_d):
+            all_items.extend(_diagnostic_items(result))
+        categories = [item.get("category") for item in all_items
+                      if item.get("category")]
+        dominant = (max(set(categories), key=categories.count)
+                    if categories else "")
+        condition_ids = sorted({str(item.get("condition_id"))
+                                for item in all_items
+                                if item.get("condition_id")})
+        titles = list(dict.fromkeys(
+            item.get("title") for item in all_items if item.get("title")))
+        a_count, b_count = _diagnostic_count(pass_a), _diagnostic_count(pass_b)
+        c_count, d_count = _diagnostic_count(pass_c), _diagnostic_count(pass_d)
+        deterministic_market = any(
+            (result or {}).get("usable_market")
+            for result in (pass_a, pass_b, pass_c, pass_d))
+        if a_count == 0 and c_count == 0:
+            classification = "LIKELY_MISSING_EXIT_MARKET"
+        elif a_count == 0 and c_count > 0:
+            classification = "GTIN_RETRIEVAL_FAILURE"
+        elif a_count > 0 and b_count == 0:
+            classification = "GTIN_CONDITION_FILTER_FAILURE"
+        elif c_count > 0 and d_count == 0:
+            classification = "MODEL_CONDITION_FILTER_FAILURE"
+        elif (_diagnostic_depth(pass_a) == 0 and
+              _diagnostic_depth(pass_c) == 0):
+            classification = "IDENTITY_COHERENCE_REJECTION"
+        else:
+            classification = "DETERMINISTIC_MARKET_FOUND"
+        output.append({
+            "model": row["model"], "manufacturer": row["manufacturers"],
+            "gtin": gtin, "source_conditions": row["conditions"],
+            "specific_condition": specific, "broad_condition": broad,
+            "audited_at": audited_at, "ebay_region": region,
+            "gtin_unfiltered_count": a_count,
+            "gtin_condition_count": b_count,
+            "model_unfiltered_count": c_count,
+            "model_condition_count": d_count,
+            "gtin_unfiltered_exact_depth": _diagnostic_depth(pass_a),
+            "gtin_condition_exact_depth": _diagnostic_depth(pass_b),
+            "model_unfiltered_exact_depth": _diagnostic_depth(pass_c),
+            "model_condition_exact_depth": _diagnostic_depth(pass_d),
+            "gtin_unfiltered_status": _diagnostic_status(pass_a),
+            "gtin_condition_status": _diagnostic_status(pass_b),
+            "model_unfiltered_status": _diagnostic_status(pass_c),
+            "model_condition_status": _diagnostic_status(pass_d),
+            "dominant_category_id": dominant,
+            "returned_condition_ids": ";".join(condition_ids),
+            "returned_titles_json": json.dumps(titles, separators=(",", ":")),
+            "diagnostic_classification": classification,
+            "deterministic_market_found": int(deterministic_market),
+        })
+    opener = gzip.open if str(out_path).endswith(".gz") else open
+    with opener(out_path, "wt", newline="") as stream:
+        writer = csv.DictWriter(stream,
+                                fieldnames=RESOLVER_DIAGNOSTIC_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    return {
+        "identities": len(output),
+        "gtin_unfiltered_hits": sum(
+            int(row["gtin_unfiltered_count"]) > 0 for row in output),
+        "gtin_condition_hits": sum(
+            int(row["gtin_condition_count"]) > 0 for row in output),
+        "model_unfiltered_hits": sum(
+            int(row["model_unfiltered_count"]) > 0 for row in output),
+        "model_condition_hits": sum(
+            int(row["model_condition_count"]) > 0 for row in output),
+        "deterministic_markets": sum(
+            int(row["deterministic_market_found"]) for row in output),
     }

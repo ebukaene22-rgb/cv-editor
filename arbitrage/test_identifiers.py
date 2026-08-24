@@ -216,6 +216,24 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(result["identities"], 1)
         self.assertFalse(result["advance_economics"])
 
+    def test_unfiltered_search_has_no_condition_clause(self):
+        self.assertEqual(comp.EbayComp._search_filter(None),
+                         "buyingOptions:{FIXED_PRICE}")
+        self.assertIn("conditions:{USED}",
+                      comp.EbayComp._search_filter("broad_used"))
+
+    def test_model_identity_accepts_exact_model_not_title(self):
+        details = [{
+            "brand": "LG Electronics", "model": "DLEX4080B", "mpn": "",
+            "condition": "Used", "condition_id": "3000", "pack": "",
+            "lot_size": "", "price": 500, "currency": "USD",
+            "title": "LG dryer DLEX4080B", "category": "207",
+        }]
+        result = comp.EbayComp._classify_mpn_result(
+            "LG", "DLEX4080B", details, 1, 1, False, 1, None, "model")
+        self.assertEqual(result["exact_model_items"], 1)
+        self.assertTrue(result["usable_market"])
+
     def test_source_brand_matching_uses_only_approved_families(self):
         self.assertEqual(MPN.source_brand_match("Frigidaire", "Electrolux"),
                          "CORPORATE_BRAND_FAMILY")

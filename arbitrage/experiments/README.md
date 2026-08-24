@@ -121,6 +121,17 @@ python3 scan.py liquidation-exit-audit
 The frozen result is recorded in `LIQUIDATION-EXIT-GATE.md`, with machine
 evidence in `liquidation-exit-resolution.csv.gz`.
 
+That first condition-coupled GTIN result is superseded by the four-pass
+diagnostic:
+
+```bash
+python3 scan.py liquidation-resolver-diagnostic
+```
+
+The corrected interpretation is in `LIQUIDATION-RESOLVER-DIAGNOSTIC.md`, with
+all raw retrieval and deterministic acceptance evidence in
+`liquidation-resolver-diagnostic.csv.gz`.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

@@ -580,6 +580,25 @@ def cmd_liquidation_exit_audit(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_liquidation_resolver_diagnostic(args):
+    """Run four frozen passes to isolate GTIN, model, and condition failures."""
+    import comp as C
+    import mpn as M
+    ebay = C.EbayComp(db())
+    if ebay.synthetic:
+        sys.exit("liquidation-resolver-diagnostic requires eBay credentials")
+    totals = M.run_liquidation_resolver_diagnostic(
+        ebay, args.universe, args.out, region=args.ebay_region,
+        min_market_listings=args.min_market_listings)
+    print(f"resolver diagnostic: {totals['identities']} frozen identities")
+    print(f"A GTIN unfiltered: {totals['gtin_unfiltered_hits']}; "
+          f"B GTIN broad-condition: {totals['gtin_condition_hits']}; "
+          f"C model unfiltered: {totals['model_unfiltered_hits']}; "
+          f"D model condition: {totals['model_condition_hits']}")
+    print(f"deterministic markets: {totals['deterministic_markets']}")
+    print(f"evidence -> {args.out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -866,6 +885,14 @@ def main():
     le.add_argument("--ebay-region", default="US")
     le.add_argument("--min-market-listings", type=int, default=3)
     le.set_defaults(fn=cmd_liquidation_exit_audit)
+    ld = sub.add_parser("liquidation-resolver-diagnostic")
+    ld.add_argument("--universe",
+                    default="experiments/mpn-manifest-unmatched-identities.csv")
+    ld.add_argument("--out",
+                    default="experiments/liquidation-resolver-diagnostic.csv.gz")
+    ld.add_argument("--ebay-region", default="US")
+    ld.add_argument("--min-market-listings", type=int, default=3)
+    ld.set_defaults(fn=cmd_liquidation_resolver_diagnostic)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

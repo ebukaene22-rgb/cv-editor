@@ -77,6 +77,12 @@ _BRAND_ALIASES = {
 
 def canonical_brand(value):
     brand = "".join(ch for ch in str(value or "").lower() if ch.isalnum())
+    brand = {
+        "lgelectronics": "lg", "lgelectronicsappliance": "lg",
+        "samsungelectronics": "samsung", "samsungappliances": "samsung",
+        "laskometalproducts": "lasko", "sharpelectronics": "sharp",
+        "frigidairecoelectrolux": "frigidaire",
+    }.get(brand, brand)
     return _BRAND_ALIASES.get(brand, brand)
 
 COMP_TTL = 6 * 3600          # seconds; comps are cached to stay inside quota
@@ -155,7 +161,7 @@ class EbayComp:
                 "EBAY_CLIENT_SECRET")
         mkt = marketplace_id(region)
         key = hashlib.sha1(
-            f"gtin-v4|{mkt}|{gtin}|{condition}|{limit}|{detail_limit}|"
+            f"gtin-v5|{mkt}|{gtin}|{condition}|{limit}|{detail_limit}|"
             f"{min_market_listings}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
@@ -173,32 +179,48 @@ class EbayComp:
     def lookup_mpn(self, brand, mpn, region="US", limit=20,
                    detail_limit=20, min_market_listings=3, condition="new"):
         """Search by brand + MPN and confirm both from item detail fields."""
+        return self._lookup_brand_identifier(
+            brand, mpn, "mpn", region, limit, detail_limit,
+            min_market_listings, condition)
+
+    def lookup_model(self, brand, model, region="US", limit=20,
+                     detail_limit=20, min_market_listings=3, condition=None):
+        """Search by brand + model and confirm an exact model or MPN field."""
+        return self._lookup_brand_identifier(
+            brand, model, "model", region, limit, detail_limit,
+            min_market_listings, condition)
+
+    def _lookup_brand_identifier(self, brand, identifier, identity_kind,
+                                 region, limit, detail_limit,
+                                 min_market_listings, condition):
         if self.synthetic:
             raise RuntimeError(
                 "exact MPN resolution requires EBAY_CLIENT_ID and "
                 "EBAY_CLIENT_SECRET")
         mkt = marketplace_id(region)
-        brand_key, mpn_key = canonical_brand(brand), canonical_mpn(mpn)
-        if not brand_key or not mpn_key:
-            raise ValueError("brand and MPN are required")
+        brand_key = canonical_brand(brand)
+        identifier_key = canonical_mpn(identifier)
+        if not brand_key or not identifier_key:
+            raise ValueError("brand and identifier are required")
         key = hashlib.sha1(
-            f"mpn-v3|{mkt}|{brand_key}|{mpn_key}|{condition}|{limit}|{detail_limit}|"
+            f"{identity_kind}-v4|{mkt}|{brand_key}|{identifier_key}|"
+            f"{condition}|{limit}|{detail_limit}|"
             f"{min_market_listings}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
         if row and time.time() - row[0] < COMP_TTL:
             self.cache_hits += 1
             cached = json.loads(row[1])
-            if cached.get("identity_rule_version") == 3:
+            if cached.get("identity_rule_version") == 4:
                 return cached
             return self._classify_mpn_result(
-                brand, mpn, cached.get("items", []), cached.get("n", 0),
+                brand, identifier, cached.get("items", []), cached.get("n", 0),
                 cached.get("returned", 0),
                 cached.get("resolution_status") == "API_ERROR",
-                min_market_listings, condition)
+                min_market_listings, condition, identity_kind)
         out = self._live_mpn(
-            brand, mpn, mkt, limit, detail_limit, min_market_listings,
-            condition)
+            brand, identifier, mkt, limit, detail_limit, min_market_listings,
+            condition, identity_kind)
         if out is not None:
             self.conn.execute("INSERT OR REPLACE INTO comps VALUES (?,?,?)",
                               (key, time.time(), json.dumps(out)))
@@ -307,13 +329,9 @@ class EbayComp:
 
     def _live_gtin(self, gtin, mkt, limit, detail_limit,
                    min_market_listings, condition=None):
-        if condition is not None and condition not in CONDITION_IDS:
-            raise ValueError(f"unsupported condition family {condition!r}")
-        condition_id = CONDITION_IDS.get(condition, CONDITION_IDS["new"])
-        url = BROWSE + "?" + urllib.parse.urlencode({
-            "gtin": gtin, "limit": str(limit),
-            "filter": ("buyingOptions:{FIXED_PRICE},conditionIds:{" +
-                       condition_id + "}")})
+        params = {"gtin": gtin, "limit": str(limit),
+                  "filter": self._search_filter(condition)}
+        url = BROWSE + "?" + urllib.parse.urlencode(params)
         data = self._browse_json(url, mkt)
         if data is None:
             return None
@@ -374,7 +392,7 @@ class EbayComp:
             "returned": len(summaries), "inspected": len(details),
             "exact_gtin_items": len(gtin_items),
             "exact_condition_gtin_items": len(exact_items),
-            "condition_family": condition or "new",
+            "condition_family": condition or "unfiltered",
             "coherent_depth": len(exact_items) if coherent else 0,
             "coherent": coherent,
             "usable_market": usable, "resolution_status": status,
@@ -389,13 +407,10 @@ class EbayComp:
         }
 
     def _live_mpn(self, brand, mpn, mkt, limit, detail_limit,
-                  min_market_listings, condition="new"):
+                  min_market_listings, condition="new", identity_kind="mpn"):
         query = f"{brand} {mpn}"
-        if condition not in CONDITION_IDS:
-            raise ValueError(f"unsupported condition family {condition!r}")
         params = {"q": query[:100], "limit": str(limit),
-                  "filter": ("buyingOptions:{FIXED_PRICE},conditionIds:{" +
-                             CONDITION_IDS[condition] + "}")}
+                  "filter": self._search_filter(condition)}
         url = BROWSE + "?" + urllib.parse.urlencode(params)
         data = self._browse_json(url, mkt)
         if data is None:
@@ -425,10 +440,31 @@ class EbayComp:
 
         return self._classify_mpn_result(
             brand, mpn, details, int(data.get("total", len(summaries))),
-            len(summaries), detail_failed, min_market_listings, condition)
+            len(summaries), detail_failed, min_market_listings, condition,
+            identity_kind)
+
+    @staticmethod
+    def _search_filter(condition):
+        base = "buyingOptions:{FIXED_PRICE}"
+        if condition is None:
+            return base
+        if condition == "broad_used":
+            return base + ",conditions:{USED}"
+        if condition == "broad_new":
+            return base + ",conditions:{NEW}"
+        if condition not in CONDITION_IDS:
+            raise ValueError(f"unsupported condition family {condition!r}")
+        return base + ",conditionIds:{" + CONDITION_IDS[condition] + "}"
 
     @staticmethod
     def _condition_matches(value, expected, condition_id=""):
+        if expected is None:
+            return True
+        if expected == "broad_used":
+            return str(condition_id or "") in {
+                "3000", "4000", "5000", "6000", "7000"}
+        if expected == "broad_new":
+            return str(condition_id or "") in {"1000", "1500", "1750"}
         if str(condition_id or "") == CONDITION_IDS.get(expected):
             return True
         actual = "".join(ch for ch in str(value or "").casefold()
@@ -446,21 +482,27 @@ class EbayComp:
     @staticmethod
     def _classify_mpn_result(brand, mpn, details, active_total, returned,
                              detail_failed, min_market_listings,
-                             condition="new"):
+                             condition="new", identity_kind="mpn"):
         expected_mpn = canonical_mpn(mpn)
         expected_brand = canonical_brand(brand)
         for item in details:
-            item["exact_mpn"] = canonical_mpn(item["mpn"]) == expected_mpn
+            item["exact_mpn"] = canonical_mpn(item.get("mpn")) == expected_mpn
+            item["exact_model"] = canonical_mpn(item.get("model")) == expected_mpn
+            item["exact_identifier"] = (item["exact_mpn"] if
+                identity_kind == "mpn" else
+                item["exact_mpn"] or item["exact_model"])
             item["exact_brand"] = (
                 canonical_brand(item["brand"]) == expected_brand)
             item["exact_brand_mpn"] = (
                 item["exact_mpn"] and item["exact_brand"])
+            item["exact_brand_identifier"] = (
+                item["exact_identifier"] and item["exact_brand"])
             item["exact_condition"] = EbayComp._condition_matches(
                 item.get("condition"), condition, item.get("condition_id"))
             item["exact_identity"] = (
-                item["exact_brand_mpn"] and item["exact_condition"])
+                item["exact_brand_identifier"] and item["exact_condition"])
         brand_mpn_items = [item for item in details
-                           if item["exact_brand_mpn"]]
+                           if item["exact_brand_identifier"]]
         exact_items = [item for item in details if item["exact_identity"]]
         ambiguous_fields = []
         for field in ("pack", "lot_size"):
@@ -488,9 +530,13 @@ class EbayComp:
         else:
             status = "EXACT_SHALLOW"
         return {
-            "brand": brand, "mpn": mpn, "condition_family": condition,
+            "brand": brand, "mpn": mpn, "identity_kind": identity_kind,
+            "condition_family": condition or "unfiltered",
             "n": active_total, "returned": returned, "inspected": len(details),
             "exact_mpn_items": sum(item["exact_mpn"] for item in details),
+            "exact_model_items": sum(item["exact_model"] for item in details),
+            "exact_identifier_items": sum(
+                item["exact_identifier"] for item in details),
             "exact_brand_mpn_items": len(brand_mpn_items),
             "coherent_depth": coherent_depth, "coherent": coherent,
             "usable_market": usable, "resolution_status": status,
@@ -500,7 +546,7 @@ class EbayComp:
             "p75_p25_ratio": (p75 / p25 if p25 and p75 else None),
             "currency": next((item["currency"] for item in exact_items
                               if item["currency"]), ""),
-            "items": details, "synthetic": False, "identity_rule_version": 3,
+            "items": details, "synthetic": False, "identity_rule_version": 4,
         }
 
     @staticmethod
