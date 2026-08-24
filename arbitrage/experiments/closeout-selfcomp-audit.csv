@@ -1,0 +1,22 @@
+mpn,source_domain,source_price_gbp,gate_p25_gbp,gate_cm_gbp,comp_seller,comp_price_gbp,comp_condition,comp_title,self_comp,self_comp_reason,sets_gate_p25
+VCNRTXA4000,www.serverpartdeals.com,585.09,791.24,128.28,motorboogie,769.53,Gebraucht,PNY/NVIDIA RTX A4000 16GB GDDR6 4x DP Graphics Card,false,distinct,false
+VCNRTXA4000,www.serverpartdeals.com,585.09,791.24,128.28,partsbuego,781.90,Used,HP / PNY NVIDIA RTX A4000 16GB GDDR6 PCIE 4.0 Graphics Card M12947-001,false,distinct,false
+VCNRTXA4000,www.serverpartdeals.com,585.09,791.24,128.28,haubrich-it,791.24,Neu,"Nvidia RTX A4000, 16GB GDDR6, 4x DP (PNY VCNRTXA4000-PB), 35364033855",false,distinct,true
+CA08226-E906,www.itinstock.com,779.00,984.00,111.53,itinstock,984.00,Used,"Fujitsu Eternus DX S3/S4/S5 3.84TB 12G SAS TLC RI 2.5"" SFF SSD CA08226-E906",true,seller 'itinstock' is source 'www.itinstock.com',true
+CA07670-E236,www.itinstock.com,760.00,960.00,108.47,itinstock,960.00,Used,Fujitsu DX S3 S4 MLC SSD SAS 3.84TB 12G 3.5 CA07670-E236 10602115739 38049310,true,seller 'itinstock' is source 'www.itinstock.com',true
+FAN-7130-1U-R,www.itinstock.com,760.00,960.00,108.47,itinstock,960.00,Used,Arista Metamako FAN-7130-1U-R 7130 Series 1U Rear-to-Front Airflow Fan Module,true,seller 'itinstock' is source 'www.itinstock.com',true
+P9K04A,www.itinstock.com,760.00,960.00,108.47,itinstock,960.00,New,New HPE P9K04A 22U 600mm 1075mm G2 Kit Advanced Pallet Rack Cabinet 863286-001,true,seller 'itinstock' is source 'www.itinstock.com',true
+TSZ1535987,www.itinstock.com,760.00,960.00,108.47,itinstock,960.00,New,NEW CPI ZetaFrame 45U Server Rack Cabinet Enclosure 600W x 1200D TSZ1535987,true,seller 'itinstock' is source 'www.itinstock.com',true
+P9K08A,www.itinstock.com,731.50,924.00,103.89,itinstock,924.00,Used,HPE P9K08A 42U 600mm 1075mm G2 Kitted Advanced Shock Rack Server Cabinet,true,seller 'itinstock' is source 'www.itinstock.com',true
+P9K08A,www.itinstock.com,731.50,924.00,103.89,etontech,1670.00,New,P9K08A HPE 42U 600mmx1075mm G2 Kitted Advanced Shock Rack+Side Panels+Baying-NEW,false,distinct,false
+55949BX,www.itinstock.com,712.50,900.00,100.83,itinstock,900.00,Used,Lenovo 55949BX 8kVA/11kVA 3U Rack Tower Extended Battery Module EBM for UPS,true,seller 'itinstock' is source 'www.itinstock.com',true
+55949BX,www.itinstock.com,712.50,900.00,100.83,itinstock,960.00,Used,Lenovo 55949BX 8kVA/11kVA 3U Rack/Tower Extended Battery Module EBM for UPS,true,seller 'itinstock' is source 'www.itinstock.com',false
+55949BX,www.itinstock.com,712.50,900.00,100.83,itinstock,2400.00,Used,Lenovo RT8kVA 8kVA 7200W 6U Rack UPS 55948KX With Battery Module + Bypass Unit,true,seller 'itinstock' is source 'www.itinstock.com',false
+QFX10000-RE,www.itinstock.com,712.50,900.00,100.83,itinstock,900.00,Used,Juniper QFX10000-RE Routing Engine For QFX10008 QFX10016 Chassis,true,seller 'itinstock' is source 'www.itinstock.com',true
+QFX10000-RE,www.itinstock.com,712.50,900.00,100.83,itinstock,6840.00,Used,Juniper QFX10008 8-Slot 13U Ethernet Switch + 2x QFX10000-30C + 5x QFX10000-36Q,true,seller 'itinstock' is source 'www.itinstock.com',false
+QFX10000-RE,www.itinstock.com,712.50,900.00,100.83,itinstock,8880.00,Used,Juniper QFX10008 8-Slot 13U Ethernet Switch + 5x QFX10000-30C + 2x QFX10000-36Q,true,seller 'itinstock' is source 'www.itinstock.com',false
+N9K-C93108TC-FX,www.itinstock.com,665.00,840.00,93.18,itinstock,840.00,Used,Cisco Nexus N9K-C93108TC-FX 48x 10G RJ45 6x 100G QSFP28 1U B2F Managed Switch,true,seller 'itinstock' is source 'www.itinstock.com',true
+N9K-C93108TC-FX,www.itinstock.com,665.00,840.00,93.18,inetgrouponline,965.00,Used,CISCO N9K-C93108TC-FX + RAILS. 90 DAY WARRANTY. FREE UK SHIPPING,false,distinct,false
+N9K-C93108TC-FX,www.itinstock.com,665.00,840.00,93.18,dazzlingdeals007,2499.99,New,Cisco Nexus N9K-C93108TC-FX3P NX-OS Port Exhaust Rail Kit (FREE DELIVERY),false,distinct,false
+N9K-C93108TC-FX,www.itinstock.com,665.00,840.00,93.18,inetgrouponline,2875.00,Used,CISCO N9K-C93108TC-FX3P. 90 DAY WARRANTY. FREE UK SHIPPING,false,distinct,false
+N9K-C93108TC-FX,www.itinstock.com,665.00,840.00,93.18,cybergeek44,4783.56,New,CISCO N9K-C93108TC-FX3P.  (130DAY WARRANTY FREE UK SHIPPING),false,distinct,false

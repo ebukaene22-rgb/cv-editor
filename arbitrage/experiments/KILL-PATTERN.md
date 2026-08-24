@@ -1,6 +1,6 @@
-# The kill pattern — why five mechanisms died the same death (2026-08-24)
+# The kill pattern — six mechanisms, three causes (2026-08-24)
 
-Five acquisition mechanisms have now been tested to a documented kill. They
+Six acquisition mechanisms have now been tested to a documented kill. They
 were chosen to be economically independent. They were not.
 
 | # | mechanism | cohort | verdict | proximate cause |
@@ -10,8 +10,9 @@ were chosen to be economically independent. They were not.
 | 3 | Small-goods liquidation | 10 Wyze parcel lots, 46 IDs | KILL_ECONOMICS | auction cleared at market; unit value below floor |
 | 4 | Open-box / refurb | 40 reboxed rows, median £795 | KILL_ECONOMICS | refurbisher already captured the condition discount |
 | 5 | Bundle decomposition | 8,090 kits surveyed | structurally dead | splitting multiplies fulfilment by N |
+| 6 | Dealer closeout / surplus | 30 MPN rows, median £712 | KILL_SELF_COMP | 9/10 PASS comps were the source's own eBay store |
 
-## Two independent constraints, not five failures
+## Three independent constraints, not six failures
 
 ### A. The unit-value floor (arithmetic)
 
@@ -51,21 +52,56 @@ our measurement:
 no spread for a reseller downstream of it.** Every mechanism tested placed us
 downstream of exactly such an intermediary.
 
+### C. The comp is the source (measurement)
+
+Found by mechanism 6, and invisible before it — because every earlier cohort
+returned zero PASSes, so (A) and (B) were killing rows before (C) could show
+itself. Full working in `CLOSEOUT-GATE.md`.
+
+Dealer closeout produced the project's first ten PASSes, at +£93 to +£128
+contribution. Nine were the same artefact: **the only eBay listing for the
+part was the source's own eBay store**, at a constant 1.263158× its own web
+price — a dual-channel markup sized to cover eBay fees and VAT on those fees.
+The gate had measured a seller's fee markup and reported it as spread. (The
+tenth had independent comps and died on an unmodelled US→GB landed cost.)
+
+That is not a takeable spread. The dealer holds the unit at a cost basis lower
+than yours by exactly the markup you are chasing, is already in the exit venue
+with the listing live, and can reprice below you at will.
+
+Now guarded two ways in `selfcomp.py`: name matching against the source domain
+(a lower bound — it proves presence, never absence), and a name-blind
+structural detector that flags any seller whose comp/source ratio is constant
+across ≥3 distinct products.
+
 ## What this predicts
 
+The prediction recorded here — that dealer closeout would fail *if* feed-
+reachable dealers are professional operations — **was confirmed, by a
+mechanism the prediction did not anticipate.** Nine of those rows cleared the
+unit-value floor honestly, and the sources are not sophisticated repricers.
+They failed because the source was standing in the exit venue.
+
+That makes (B) and (C) two faces of one thing. A dealer with a clean product
+feed and stable MPNs has the operational maturity to run an eBay store. So the
+better a source looks to the scanner, the more likely it already occupies the
+exit venue for the same SKUs. **Machine-accessible supply and independent
+demand are anti-correlated.**
+
 A mechanism only survives if the seller's objective is **not** price
-maximisation AND the seller is **not** a pricing specialist. That combination
-is rare, and — critically — it anti-correlates with having a public feed.
+maximisation, the seller is **not** a pricing specialist, and the seller is
+**not already in the exit venue**. That combination is rare and anti-correlates
+with having a public feed.
 
-Testable prediction for the next mechanism: dealer closeout / surplus will
-fail *if* the dealers reachable by feed are professional e-commerce
-operations, and can only succeed via sources that are not machine-readable
-(phone, email, trade portals, relationships).
+Testable prediction for mechanism seven: any source whose catalogue is clean
+enough to resolve by identifier will already be present in the exit venue for
+the same SKUs. A mechanism survives only if it sources from somewhere
+structurally *barred* from the exit venue — not merely absent from it.
 
-If that prediction holds, the honest conclusion is not "try mechanism seven".
-It is that **automated public-feed sourcing and mispriced supply are close to
-mutually exclusive** — and any physical-resale business here requires exactly
-the relationship-building the project was designed to avoid.
+If that holds, the honest conclusion is not "try mechanism eight". It is that
+**automated public-feed sourcing and mispriced supply are close to mutually
+exclusive** — and any physical-resale business here requires exactly the
+relationship-building the project was designed to avoid.
 
 ## What survives regardless
 

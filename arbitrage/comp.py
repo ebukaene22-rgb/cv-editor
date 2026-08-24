@@ -138,7 +138,7 @@ class EbayComp:
         `median` is an ASKING price, not a realised sale price.
         """
         mkt = marketplace_id(region)
-        key = hashlib.sha1(f"v3|{mkt}|{query}|{limit}".encode()).hexdigest()
+        key = hashlib.sha1(f"v4|{mkt}|{query}|{limit}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
         if row and time.time() - row[0] < COMP_TTL:
@@ -283,7 +283,8 @@ class EbayComp:
             try:
                 items.append({"t": it.get("title") or "",
                               "p": float(p["value"]),
-                              "id": it.get("itemId")})
+                              "id": it.get("itemId"),
+                              "s": (it.get("seller") or {}).get("username")})
                 cur = cur or p.get("currency")
             except (KeyError, TypeError, ValueError):
                 continue

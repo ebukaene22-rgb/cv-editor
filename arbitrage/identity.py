@@ -24,6 +24,8 @@ for different failure modes.
 import re
 import statistics
 
+from arbitrage import selfcomp
+
 STOP = {"the", "a", "an", "of", "for", "with", "and", "in", "on", "by", "to",
         "new", "i", "ii"}
 # words that signal multi-unit/bundle listings
@@ -101,7 +103,8 @@ def title_matches(query, listing_title):
     return True, None
 
 
-def clean_comp(comp, query, list_gbp=None, fx=1.0, msrp_ceiling=1.35):
+def clean_comp(comp, query, list_gbp=None, fx=1.0, msrp_ceiling=1.35,
+               source_domain=None):
     """
     comp: raw lookup result carrying `items` [(title, price)].
     -> filtered comp dict + rejection accounting, or None if nothing survives.
@@ -112,10 +115,21 @@ def clean_comp(comp, query, list_gbp=None, fx=1.0, msrp_ceiling=1.35):
     live -- the earlier version rejected those comps as "aspirational" and
     thereby rejected the one confirmed-good candidate. Bundles are caught
     by title structure instead.
+
+    `source_domain` removes comps published by the source's own eBay store.
+    See selfcomp.py: the dealer-closeout gate's ten PASSes were nine
+    self-comps and one landed-cost error. A dealer's eBay ask for the unit
+    on its own shelf is not a market price for that unit.
     """
     items = comp.get("items")
     if not items:                      # cache from before v2, or synthetic
         return dict(comp, filtered=False)
+    self_dropped = {}
+    if source_domain:
+        items, dropped, self_dropped = selfcomp.strip_self_comps(
+            items, source_domain)
+        if not items:
+            return None
     kept, rejects = [], {}
     for it in items:
         ok, why = title_matches(query, it["t"])
@@ -133,6 +147,7 @@ def clean_comp(comp, query, list_gbp=None, fx=1.0, msrp_ceiling=1.35):
             "p25": kept[max(0, len(kept) // 4 - 1)],
             "n": len(kept),            # verified-identity count, not eBay total
             "n_raw": len(items), "rejected": rejects,
+            "self_comps": self_dropped,
             "scarcity_premium": scarcity,
             "currency": comp["currency"], "synthetic": comp.get("synthetic", False),
             "filtered": True}
