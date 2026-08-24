@@ -31,14 +31,35 @@ That reported **itinstock -- the one source known for certain to run an eBay
 store -- as absent**, because no itinstock listing has "itinstock" in its
 title. Categories, not keywords.
 
-## Four outcomes, and why the fourth exists
+## Six outcomes: name morphology is not identity
 
-    active        handle recognised AND holding live listings
-    dormant       handle recognised but no listings in any probed category
-    not_detected  no candidate handle recognised by eBay
-    inconclusive  one or more probes errored -- NOTHING is claimed
+    confirmed_active   handle with listings AND independent evidence the
+                       seller IS the source (storelink.py)
+    candidate_active   plausible handle with listings, identity unestablished
+    rejected_reseller  name matched only by containment -- an independent
+                       reseller trading on the brand name
+    dormant            plausible handle, zero listings in probed categories
+    not_detected       no plausible handle recognised by eBay
+    inconclusive       probe/API failure -- NOTHING is claimed
 
-The headline rate counts `active` over the rows that actually resolved;
+`confirmed_active` and `candidate_active` are reported separately and never
+summed into one "active" figure.
+
+An earlier version collapsed the first two, treating a `suffix` name match as
+ownership. It is not: a reseller can register `gymshark-store` exactly as
+easily as Gymshark can, and an exact handle can still be coincidence, an
+abandoned registration, or an unrelated seller. Handle morphology is evidence
+for a candidate, never proof of identity.
+
+The two error costs are not symmetric, which is why presence needs far higher
+precision than comp filtering:
+
+    comp filtering     false positive -> discard a valid comp -> a
+                       CONSERVATIVE profit estimate. Cheap.
+    presence detection false positive -> conclude the source competes in the
+                       exit venue -> can invalidate a whole sourcing
+                       strategy. Expensive.
+
 `inconclusive` rows are excluded from the denominator, never scored as
 absence.
 
@@ -90,6 +111,7 @@ import urllib.parse
 import urllib.request
 
 from arbitrage import selfcomp
+from arbitrage import storelink
 
 OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE = "https://api.ebay.com/buy/browse/v1/item_summary/search"
@@ -220,7 +242,7 @@ def seller_probe(api, handle, cat, mkt, limit=50):
     return "honoured", total, [i.get("title") or "" for i in items]
 
 
-def probe_domain(api, domain, region, verbose=True):
+def probe_domain(api, domain, region, verbose=True, confirm=True):
     core = brand_core(domain)
     terms = brand_terms(domain)
     mkt = MARKETPLACE.get(region, "EBAY_US")
@@ -291,9 +313,18 @@ def probe_domain(api, domain, region, verbose=True):
     if errors and not total_listings:
         row["present"] = "inconclusive"
     elif not real:
-        row["present"] = "not_detected"
+        row["present"] = ("rejected_reseller" if rejected else "not_detected")
     elif total_listings > 0:
-        row["present"] = "active"
+        confirmed = ""
+        if confirm:
+            linked, _, _ = storelink.brand_ebay_handles(domain)
+            for h in real:
+                ok, why = storelink.confirms(domain, h, linked=linked)
+                if ok:
+                    confirmed = why
+                    break
+        row["present"] = "confirmed_active" if confirmed else "candidate_active"
+        row["identity_evidence"] = confirmed
     else:
         row["present"] = "dormant"
     row["errors"] = errors
@@ -375,8 +406,9 @@ def main(argv=None):
             break
 
     cols = ["domain", "region", "brand_core", "marketplace", "present",
-            "brand_in_titles", "handles", "rejected_handles", "listings",
-            "categories", "errors", "sample_title", "notes"]
+            "brand_in_titles", "identity_evidence", "handles",
+            "rejected_handles", "listings", "categories", "errors",
+            "sample_title", "notes"]
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols)
@@ -384,17 +416,21 @@ def main(argv=None):
         for r in rows:
             w.writerow({c: r.get(c, "") for c in cols})
 
-    act = sum(1 for r in rows if r["present"] == "active")
-    dorm = sum(1 for r in rows if r["present"] == "dormant")
-    inc = sum(1 for r in rows if r["present"] == "inconclusive")
-    selfb = sum(1 for r in rows if r["present"] == "active"
-                and r.get("brand_in_titles") == "yes")
+    import collections
+    tally = collections.Counter(r["present"] for r in rows)
+    inc = tally["inconclusive"]
     resolved = len(rows) - inc
+    print("", file=sys.stderr)
+    for state in ("confirmed_active", "candidate_active", "rejected_reseller",
+                  "dormant", "not_detected", "inconclusive"):
+        print(f"  {state:18} {tally[state]:>4}", file=sys.stderr)
     if resolved:
-        print(f"\nACTIVE in exit venue : {act}/{resolved} "
-              f"({act/resolved:.0%})  -- LOWER BOUND", file=sys.stderr)
-    print(f"  of which self-branded in titles: {selfb}", file=sys.stderr)
-    print(f"handle recognised but dormant   : {dorm}", file=sys.stderr)
+        print(f"\nCONFIRMED active : {tally['confirmed_active']}/{resolved} "
+              f"({tally['confirmed_active']/resolved:.1%})", file=sys.stderr)
+        print(f"CANDIDATE active : {tally['candidate_active']}/{resolved} "
+              f"({tally['candidate_active']/resolved:.1%})  "
+              f"-- identity NOT established", file=sys.stderr)
+    print("all figures are LOWER BOUNDS on presence", file=sys.stderr)
     if inc:
         print(f"INCONCLUSIVE (API errors, excluded): {inc} "
               f"-- re-run with --resume", file=sys.stderr)
