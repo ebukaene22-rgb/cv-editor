@@ -48,7 +48,10 @@ class ExperimentTests(unittest.TestCase):
 
     def test_condition_and_bundle_cohorts_are_explicit(self):
         ts = "2026-01-01T00:00:00Z"
-        self.add(ts, "shop.test", "OB-1", 1, title="Camera OPEN BOX")
+        self.add(ts, "shop.test", "OB-1", 1, price=60, compare=100,
+                 title="Camera OPEN BOX")
+        self.add(ts, "shop.test", "LOW-1", 1, price=10, compare=20,
+                 title="Cable OPEN BOX")
         self.add(ts, "shop.test", "KIT-1", 1, title="Coffee Starter Kit")
         rates = {"USD": 1.0, "GBP": 0.8}
         with tempfile.TemporaryDirectory() as tmp:
@@ -61,6 +64,8 @@ class ExperimentTests(unittest.TestCase):
             with open(openbox, newline="") as f:
                 row = next(csv.DictReader(f))
             self.assertEqual(row["source_condition"], "open_box")
+            self.assertEqual(row["unit_value_gate"], "PASS_PROXY_ONLY")
+            self.assertEqual(row["exit_value_proxy_gbp"], "80.00")
             self.assertIn("condition_match", row)
             with open(bundles, newline="") as f:
                 row = next(csv.DictReader(f))

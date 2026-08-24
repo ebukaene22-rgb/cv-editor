@@ -1,56 +1,77 @@
-# Unit-value floor — the constraint underneath every mechanism (2026-08-24)
+# Unit-Value Floor
 
-Written after the small-goods liquidation KILL, because that cohort's failure
-is being read as evidence about *liquidation* when it is mostly evidence about
-*unit value*.
+Status: **CORE PRE-RESOLUTION RULE**  
+Adopted: 2026-08-24
 
-## What the Wyze cohort actually was
+## Rule
 
-136 of 138 manifest lines are one brand. Exit prices $9.99–$21.49 against
-$10/unit outbound shipping — fulfilment is **47–100% of revenue** before a
-single fee. The gate imposed a GBP 15 contribution requirement on items
-selling for GBP 7–16. No acquisition mechanism clears that: not liquidation,
-not dealer closeout, not open-box, not bundle decomposition. The verdict
-KILL_ECONOMICS is correct for the cohort and near-uninformative about the
-mechanism.
+Every physical-product experiment must screen unit value before identity
+enrichment, marketplace resolution, or mechanism scoring.
 
-## The floor, computed
+- Default expected exit floor: **GBP 50**
+- Preferred expected exit band: **GBP 75-200**
+- Default bounded cohort band: **GBP 50-200**
+- Required net contribution: **GBP 15 per unit**
 
-Minimum exit price to reach a target contribution, assuming a *generous* 40%
-buy-to-exit ratio (i.e. a strong sourcing discount already granted), AE seller,
-12.9% FVF, per-order + regulatory fees, 6% returns:
+The GBP 50 screen is a necessary condition, not evidence of profitability.
+Before marketplace resolution, expected exit may only be represented by a
+labelled source-side proxy such as explicit reference retail. It must never be
+reported as an observed resale value. The marketplace's exact-condition p25
+replaces the proxy once resolution runs.
 
-| target CM | ship £3 | ship £5 | ship £8 |
+## Economic Basis
+
+For source cost `S`, outbound fulfilment `F`, proportional fees `f`, returns
+allowance `r`, and target contribution `T`, the minimum required exit is:
+
+```text
+minimum_exit = (S + F + T) / (1 - f - r)
+```
+
+Assuming a strong 40% buy-to-exit ratio, an AE seller, 12.9% final-value fee,
+per-order and regulatory fees, and 6% returns, the approximate floors are:
+
+| Target contribution | Ship GBP 3 | Ship GBP 5 | Ship GBP 8 |
 |---|---:|---:|---:|
-| £5 | £24 | £29 | £35 |
-| £10 | £35 | £40 | £46 |
-| £15 | £46 | £51 | £57 |
-| £20 | £57 | £61 | £68 |
-| £25 | £68 | £72 | £79 |
+| GBP 5 | GBP 24 | GBP 29 | GBP 35 |
+| GBP 10 | GBP 35 | GBP 40 | GBP 46 |
+| GBP 15 | GBP 46 | GBP 51 | GBP 57 |
+| GBP 20 | GBP 57 | GBP 61 | GBP 68 |
+| GBP 25 | GBP 68 | GBP 72 | GBP 79 |
 
-Below these exit prices the target is unreachable **at any acquisition
-discount**, because fees and fulfilment are near-fixed per unit while margin
-scales with price.
+These are scenario thresholds, not universal impossibility bounds: a lower
+acquisition ratio lowers the required exit. They show why GBP 50 is a sensible
+default screen under ordinary sourcing and small-parcel fulfilment.
 
-## Consequences for mechanism selection
+## Wyze Evidence
 
-1. **A £15 contribution requires roughly a £50+ exit product.** Every cohort
-   run to date has been dominated by sub-£40 goods. That is the common factor
-   behind clearance, fitment, small-goods liquidation, and multipack
-   decomposition failing — not four independent mechanism failures.
-2. **Bundle decomposition is structurally worse than it looks**, and this is
-   why: splitting a kit into N components multiplies fulfilment by N while
-   revenue only redistributes. Adam's Floor Mat Holder prices at 1/2/4-pack
-   ($19.99/$34.99/$59.99) give a $19.97 gross spread on decomposition — and
-   4x£5 shipping erases it. Decomposition only works where components are
-   individually above the floor, which is rare in multipacks by construction.
-3. **The screen should be applied before sourcing, not after.** Any future
-   cohort should be filtered to candidates whose *exit* price clears the floor
-   for the target contribution, before identity or economics work is spent.
+The small-goods cohort contained 136/138 manifest lines from Wyze. Its four
+resolved exit markets had active p25 values of $9.99-$21.49 against $10
+outbound shipping. Fulfilment alone consumed roughly 47-100% of revenue before
+fees. `KILL_ECONOMICS` is decisive for that cohort but weak evidence against
+liquidation generally because the unit values were structurally unsuitable.
 
-## Recommendation
+## Consequences
 
-Stop selecting cohorts by acquisition mechanism and start selecting by unit
-value. The next test — whatever its mechanism — should draw only from
-products with a plausible exit above ~£50, and should treat any cohort whose
-median exit is under £30 as pre-failed.
+- Clearance, fitment, small-goods liquidation, and multipack decomposition
+  results must be interpreted through unit value rather than as four wholly
+  independent mechanism failures.
+- Bundle decomposition applies the floor independently to every child because
+  splitting into `N` components multiplies fulfilment by `N`.
+- Whole-appliance liquidation remains excluded for product-type, freight,
+  storage, and handling reasons even though its unit values are high.
+
+## Ordering
+
+1. Verify current availability, source price, and explicit condition.
+2. Apply the GBP 50-200 unit-value proxy band.
+3. Freeze the cohort and checksum it.
+4. Resolve exact model/MPN and structured brand.
+5. Enforce condition, product-type, and category coherence.
+6. Replace the proxy with exact-condition active p25.
+7. Apply fees, shipping, returns, source shipping, and acquisition cost.
+8. Require at least GBP 15 contribution per unit.
+
+Rows below the floor are `REJECT_UNIT_VALUE_PRE_RESOLUTION`. A source universe
+that cannot provide the requested frozen cohort is
+`INSUFFICIENT_SOURCE_COHORT`, not a failed arbitrage mechanism.

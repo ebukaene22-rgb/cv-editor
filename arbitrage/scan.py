@@ -641,8 +641,16 @@ def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
     conn = db()
-    n = E.write_openbox_cohort(conn, fx_rates(conn), args.out, args.n)
-    print(f"open-box/refurb cohort: {n}/{args.n} rows -> {args.out}")
+    n = E.write_openbox_cohort(
+        conn, fx_rates(conn), args.out, args.n,
+        min_exit_proxy_gbp=args.min_exit_proxy_gbp,
+        max_exit_proxy_gbp=args.max_exit_proxy_gbp)
+    verdict = "FROZEN" if n == args.n else "INSUFFICIENT_SOURCE_COHORT"
+    print(f"open-box/refurb cohort: {n}/{args.n} rows; verdict: {verdict}")
+    print(f"unit-value proxy band: GBP {args.min_exit_proxy_gbp:.2f}-"
+          f"{args.max_exit_proxy_gbp:.2f}")
+    print(f"sha256: {E.file_checksum(args.out)}")
+    print(f"evidence -> {args.out}")
 
 
 def cmd_bundle_cohort(args):
@@ -951,6 +959,8 @@ def main():
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")
+    ob.add_argument("--min-exit-proxy-gbp", type=float, default=50.0)
+    ob.add_argument("--max-exit-proxy-gbp", type=float, default=200.0)
     ob.set_defaults(fn=cmd_openbox_cohort)
     bu = sub.add_parser("bundle-cohort")
     bu.add_argument("-n", type=int, default=20)

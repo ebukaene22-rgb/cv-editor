@@ -2,6 +2,7 @@
 """Bounded experiment tooling for the post-clearance pivots."""
 import csv
 import gzip
+import hashlib
 import json
 import os
 import re
@@ -20,6 +21,9 @@ CONDITION_GRADES = (
     ("cosmetic_damage", ("scratch", "dent", "blemish")),
     ("pre_owned", ("pre-owned", "preowned")),
 )
+
+DEFAULT_MIN_EXIT_PROXY_GBP = 50.0
+DEFAULT_MAX_EXIT_PROXY_GBP = 200.0
 
 BUNDLE_RE = re.compile(
     r"\b(bundle|kit|set|pack|duo|trio|collection|assortment|starter)\b|\d+\s*[- ]?piece",
@@ -188,7 +192,12 @@ def write_measurement(conn, out_path, review_path, review_n=20):
     return totals
 
 
-def write_openbox_cohort(conn, rates, out_path, limit=30):
+def write_openbox_cohort(conn, rates, out_path, limit=30,
+                         min_exit_proxy_gbp=DEFAULT_MIN_EXIT_PROXY_GBP,
+                         max_exit_proxy_gbp=DEFAULT_MAX_EXIT_PROXY_GBP):
+    """Freeze condition-explicit rows that first clear the unit-value gate."""
+    if not 0 < min_exit_proxy_gbp <= max_exit_proxy_gbp:
+        raise ValueError("invalid open-box exit-proxy band")
     sigs = _signal_cache(conn)
     candidates = {}
     for row in _latest_rows(conn):
@@ -197,10 +206,16 @@ def write_openbox_cohort(conn, rates, out_path, limit=30):
             continue
         key = (row["domain"], R.product_key(row).lower())
         buy = _to_gbp(row["price"], row["currency"], rates)
+        reference = (row["compare"] if row["compare"] and
+                     row["compare"] > row["price"] else row["price"])
+        exit_proxy = _to_gbp(reference, row["currency"], rates)
+        if not min_exit_proxy_gbp <= exit_proxy <= max_exit_proxy_gbp:
+            continue
         discount = (1 - row["price"] / row["compare"]
                     if row["compare"] and row["compare"] > row["price"] else 0)
         signal = sigs.get(row["domain"], {}).get(row["sku"], {})
         candidate = {"row": row, "grade": grade, "buy": buy,
+                     "exit_proxy": exit_proxy,
                      "discount": discount, "signal": signal}
         if key not in candidates or buy < candidates[key]["buy"]:
             candidates[key] = candidate
@@ -215,6 +230,13 @@ def write_openbox_cohort(conn, rates, out_path, limit=30):
             "product_type": row["ptype"] or "", "source_url": row["url"] or "",
             "source_condition": item["grade"], "source_currency": row["currency"],
             "source_price": row["price"], "source_gbp": f"{item['buy']:.2f}",
+            "exit_value_proxy_gbp": f"{item['exit_proxy']:.2f}",
+            "exit_proxy_basis": ("source_compare_at" if row["compare"] and
+                                  row["compare"] > row["price"]
+                                  else "source_price"),
+            "unit_value_floor_gbp": f"{min_exit_proxy_gbp:.2f}",
+            "unit_value_ceiling_gbp": f"{max_exit_proxy_gbp:.2f}",
+            "unit_value_gate": "PASS_PROXY_ONLY",
             "source_discount_pct": f"{item['discount'] * 100:.1f}",
             "source_cycles": sig.get("cycles", 0), "market_query": query,
             "sold_search_url": _sold_url(query), "exact_model": "",
@@ -226,6 +248,8 @@ def write_openbox_cohort(conn, rates, out_path, limit=30):
     fields = list(rows[0]) if rows else [
         "id", "candidate", "sku", "product_type", "source_url",
         "source_condition", "source_currency", "source_price", "source_gbp",
+        "exit_value_proxy_gbp", "exit_proxy_basis", "unit_value_floor_gbp",
+        "unit_value_ceiling_gbp", "unit_value_gate",
         "source_discount_pct", "source_cycles", "market_query",
         "sold_search_url", "exact_model", "condition_match",
         "manual_sold_median_gbp", "manual_sold_90d", "estimated_cm_gbp",
@@ -233,6 +257,11 @@ def write_openbox_cohort(conn, rates, out_path, limit=30):
     ]
     _write(out_path, fields, rows)
     return len(rows)
+
+
+def file_checksum(path):
+    with open(path, "rb") as stream:
+        return hashlib.sha256(stream.read()).hexdigest()
 
 
 def write_bundle_cohort(conn, rates, out_path, limit=20):

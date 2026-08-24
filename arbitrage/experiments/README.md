@@ -3,6 +3,10 @@
 These sheets execute the bounded experiments selected after the broad
 clearance-arbitrage post-mortem. They are evidence ledgers, not buy lists.
 
+`UNIT-VALUE-FLOOR.md` is the core pre-resolution rule for every physical-goods
+experiment. Rows below the GBP 50 expected-exit proxy floor are rejected before
+identity or marketplace work.
+
 ## Scarcity
 
 `scarcity-measurement.csv.gz` is the full calendar-normalised SKU ledger.
@@ -139,9 +143,10 @@ all raw retrieval and deterministic acceptance evidence in
 
 ## Open box and refurbished
 
-`openbox-cohort.csv` contains 30 in-stock products whose source titles state a
-secondary condition. Verify the exact model and match the resale condition
-before entering sold evidence.
+`openbox-cohort.csv` applies the GBP 50-200 proxy band to in-stock products
+whose source titles state a secondary condition. The current monitored source
+universe produced only 1/30 qualifying rows, so the cohort is not yet sent to
+market resolution. See `OPENBOX-UNIT-VALUE-GATE.md`.
 
 Pass at 3/30 robust opportunities with contribution margin at least 15% and
 median verification time no more than 8 minutes.
