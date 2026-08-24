@@ -89,6 +89,16 @@ python3 scan.py mpn-source-audit
 Outputs `mpn-used-source-ledger.csv`; methodology and the frozen result are in
 `MPN-USED-SOURCE-GATE.md`.
 
+The next source-class check covers public manifested-liquidation inventory on
+B-Stock and Direct Liquidation. Recompute its frozen coverage decision with:
+
+```bash
+python3 scan.py mpn-liquidation-coverage
+```
+
+The 32-search snapshot is in `mpn-liquidation-coverage.csv`; interpretation and
+scope are recorded in `MPN-LIQUIDATION-COVERAGE-GATE.md`.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

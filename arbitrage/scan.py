@@ -532,6 +532,17 @@ def cmd_mpn_source_audit(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_mpn_liquidation_coverage(args):
+    """Apply the frozen-universe coverage gate to liquidation search evidence."""
+    import mpn as M
+    totals = M.run_liquidation_coverage_gate(args.coverage, args.resolution)
+    verdict = "ADVANCE_MANIFEST_REVIEW" if totals["source_gate_passed"] else "NO_PUBLIC_COVERAGE"
+    print(f"liquidation coverage: {totals['searches']} exact searches across "
+          f"{totals['sources']} sources")
+    print(f"matched frozen identities: {totals['matched_identities']}/"
+          f"{totals['demand_rows']}; three-SKU gate: {verdict}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -797,6 +808,12 @@ def main():
     ms.add_argument("--usd-to-gbp", type=float)
     ms.add_argument("--timeout", type=int, default=20)
     ms.set_defaults(fn=cmd_mpn_source_audit)
+    ml = sub.add_parser("mpn-liquidation-coverage")
+    ml.add_argument("--coverage",
+                    default="experiments/mpn-liquidation-coverage.csv")
+    ml.add_argument("--resolution",
+                    default="experiments/mpn-resolution-ledger.csv.gz")
+    ml.set_defaults(fn=cmd_mpn_liquidation_coverage)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

@@ -185,6 +185,31 @@ class IdentifierTests(unittest.TestCase):
                          "EXACT_BRAND")
         self.assertEqual(MPN.source_brand_match("DeWalt", "Black & Decker"), "")
 
+    def test_liquidation_coverage_requires_three_frozen_identities(self):
+        resolution_fields = ["mpn", "usable_market"]
+        coverage_fields = ["source", "mpn", "exact_search_results"]
+        with tempfile.TemporaryDirectory() as tmp:
+            resolution = os.path.join(tmp, "resolution.csv")
+            coverage = os.path.join(tmp, "coverage.csv")
+            with open(resolution, "w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=resolution_fields)
+                writer.writeheader()
+                for mpn in ("A1", "B2", "C3"):
+                    writer.writerow({"mpn": mpn, "usable_market": "1"})
+            with open(coverage, "w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=coverage_fields)
+                writer.writeheader()
+                for source in ("one", "two"):
+                    for mpn in ("A1", "B2", "C3"):
+                        writer.writerow({
+                            "source": source, "mpn": mpn,
+                            "exact_search_results": "1" if source == "one" else "0",
+                        })
+            result = MPN.run_liquidation_coverage_gate(coverage, resolution)
+        self.assertEqual(result["searches"], 6)
+        self.assertEqual(result["matched_identities"], 3)
+        self.assertTrue(result["source_gate_passed"])
+
     def test_mpn_basket_parser_uses_structured_url_suffix(self):
         row = MPN._parse_candidate(
             "https://www.ereplacementparts.com/parts/dishwasher/"

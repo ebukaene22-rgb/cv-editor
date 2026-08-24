@@ -441,3 +441,25 @@ def run_used_source_audit(ebay, resolution_path, out_path, usd_to_gbp,
             row["market_status"] == "EXACT_USABLE" for row in output),
         "pre_cost_candidates": viable, "source_gate_passed": viable >= 3,
     }
+
+
+def run_liquidation_coverage_gate(coverage_path, resolution_path):
+    """Validate exact-search coverage snapshots for liquidation marketplaces."""
+    demand = [row for row in _read_csv(resolution_path)
+              if row.get("usable_market") == "1"]
+    demand_ids = {row["mpn"].casefold() for row in demand}
+    coverage = _read_csv(coverage_path)
+    sources = {row["source"] for row in coverage}
+    for source in sources:
+        observed = {row["mpn"].casefold() for row in coverage
+                    if row["source"] == source}
+        if observed != demand_ids:
+            raise ValueError(
+                f"{source} snapshot must exactly match resolver survivors")
+    matched_ids = {row["mpn"].casefold() for row in coverage
+                   if int(row["exact_search_results"]) > 0}
+    return {
+        "demand_rows": len(demand), "sources": len(sources),
+        "searches": len(coverage), "matched_identities": len(matched_ids),
+        "source_gate_passed": len(matched_ids) >= 3,
+    }
