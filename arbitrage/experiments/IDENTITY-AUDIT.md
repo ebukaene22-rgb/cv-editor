@@ -40,18 +40,38 @@ The Shopify Ajax response does not expose an explicit MPN field, so MPN
 coverage is reported as zero rather than inferred from SKU or title text. The
 single configured WooCommerce store is outside this Shopify-specific audit.
 
-The committed run did not query eBay because API credentials were unavailable.
-The optional resolver records both whether a GTIN query returns listings and
-whether batched item-detail records explicitly confirm the same GTIN. Search
-summaries alone are not treated as confirmation because eBay's `ItemSummary`
-schema does not expose GTIN. Inspected results are `EXACT` only when every
-detail confirms the queried GTIN and brand/model/variant identity fields do not
-conflict; everything else is `REJECT`.
+The resolver records both whether a GTIN query returns listings and whether
+item-detail records explicitly confirm the same GTIN. Search summaries alone
+are not treated as confirmation because eBay's `ItemSummary` schema does not
+expose GTIN. Inspected results are `EXACT` only when every detail confirms the
+queried GTIN and brand/model/variant identity fields do not conflict;
+everything else is `REJECT`.
 
-The next gate reports query resolution, exact confirmation, inspected-result
-coherence, active-listing count quartiles, exact-price median, and the share
-with at least three coherent active listings. Bundle experiments remain blocked
-until that credentialed gate is run.
+## Exact eBay GB gate
+
+The 2026-08-24 live gate selected 100 of the 795 eligible GTINs by stable hash
+and searched new, fixed-price listings on `EBAY_GB`. Every returned listing was
+then inspected through the item-detail endpoint.
+
+| Measure | Result |
+| --- | ---: |
+| GTIN queries with active results | 7 / 100 (7%) |
+| GTINs with any explicit exact confirmation | 2 / 100 (2%) |
+| GTINs coherent across all returned listings | 1 / 100 (1%) |
+| GTINs with at least 3 coherent listings | 0 / 100 (0%) |
+| Active-listing count among resolved queries | median 1; range 1-2 |
+| Exact-item price median across confirmed GTINs | GBP 110.10 |
+
+Of the seven query-resolved GTINs, five were `UNCONFIRMED` because item details
+did not report a GTIN, one was `AMBIGUOUS` because only one of two returned
+items confirmed the queried GTIN, and one was `EXACT_SHALLOW` with a single
+listing. There were no API errors in the final evidence.
+
+**Decision: exact-market resolver gate FAILED for eBay GB.** Source identity
+remains a passed infrastructure gate, but this sample does not support a usable
+deterministic source-to-eBay-GB market at the preregistered depth. Bundle
+monetisation remains blocked; unconfirmed search hits must not be promoted to
+exact identity.
 
 ## Evidence
 

@@ -174,6 +174,26 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(result["inspected"], 21)
         self.assertEqual(result["resolution_status"], "EXACT_USABLE")
 
+    def test_gtin_lookup_falls_back_when_bulk_access_is_denied(self):
+        client = comp.EbayComp(self.conn, synthetic=True)
+        calls = []
+
+        def browse(url, marketplace):
+            calls.append(url)
+            if "item_summary" in url:
+                return {"total": 1, "itemSummaries": [{"itemId": "v1|1|0"}]}
+            if "item_ids=" in url:
+                return None
+            return {"itemId": "v1|1|0", "gtin": "847974010426",
+                    "brand": "Maker", "model": "W1", "categoryId": "1",
+                    "price": {"value": "20", "currency": "GBP"}}
+
+        client._browse_json = browse
+        result = client._live_gtin("847974010426", "EBAY_GB", 50, 50, 1)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(result["exact_gtin_items"], 1)
+        self.assertEqual(result["resolution_status"], "EXACT_USABLE")
+
     def test_audit_retries_rate_limits(self):
         self.add("SKU-A", "https://shop.test/products/a")
         attempts = []
@@ -192,6 +212,32 @@ class IdentifierTests(unittest.TestCase):
                 retries=1)
         self.assertEqual(len(attempts), 2)
         self.assertEqual(totals["products_succeeded"], 1)
+
+    def test_ebay_annotation_ignores_failed_source_rows(self):
+        rows = [{"fetch_status": "error", "fetch_error": "HTTP 404"}]
+
+        class Ebay:
+            def lookup_gtin(self, gtin, region, **kwargs):
+                raise AssertionError("a failed source row must not be resolved")
+
+        results = ID._resolve_ebay(rows, Ebay(), "GB", 10, 50, 3)
+        self.assertEqual(results, {})
+
+    def test_ebay_lookup_limit_uses_stable_hash_order(self):
+        gtins = ["4006381333931", "847974010426", "5012345678900"]
+        rows = [{"gtin": gtin, "source_identity_status": "EXACT_SOURCE"}
+                for gtin in gtins]
+        attempted = []
+
+        class Ebay:
+            def lookup_gtin(self, gtin, region, **kwargs):
+                attempted.append(gtin)
+                return {"n": 0, "resolution_status": "NOT_FOUND"}
+
+        ID._resolve_ebay(rows, Ebay(), "GB", 2, 50, 3)
+        expected = sorted(
+            gtins, key=lambda value: ID.hashlib.sha1(value.encode()).hexdigest())[:2]
+        self.assertEqual(attempted, expected)
 
 
 if __name__ == "__main__":

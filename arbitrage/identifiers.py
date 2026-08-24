@@ -288,8 +288,9 @@ def _resolution_rows(results, audited_at, region):
 
 def _resolve_ebay(rows, ebay, region, max_lookups, detail_limit,
                   min_market_listings):
-    gtins = sorted({row["gtin"] for row in rows
-                    if row.get("source_identity_status") == "EXACT_SOURCE"})
+    gtins = {row["gtin"] for row in rows
+             if row.get("source_identity_status") == "EXACT_SOURCE"}
+    gtins = sorted(gtins, key=lambda gtin: hashlib.sha1(gtin.encode()).hexdigest())
     results = {}
     for gtin in gtins[:max_lookups]:
         result = ebay.lookup_gtin(
@@ -297,9 +298,10 @@ def _resolve_ebay(rows, ebay, region, max_lookups, detail_limit,
             min_market_listings=min_market_listings)
         results[gtin] = result
     for row in rows:
-        if row["gtin"] not in results:
+        gtin = row.get("gtin", "")
+        if gtin not in results:
             continue
-        result = results[row["gtin"]]
+        result = results[gtin]
         row["ebay_attempted"] = 1
         row["ebay_query_resolved"] = int(bool(result and result.get("n", 0)))
         row["ebay_exact_confirmed"] = int(bool(

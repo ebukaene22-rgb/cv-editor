@@ -36,9 +36,12 @@ python3 scan.py identity-audit --resolve-ebay \
   --min-market-listings 3
 ```
 
-The resolver batches item details through eBay `getItems`, writes inspected
-listing evidence to `ebay-resolution-ledger.csv.gz`, and never replaces exact
-marketplace confirmation with synthetic data.
+The resolver batches item details through eBay `getItems` where the keyset is
+authorized and falls back to individual `getItem` calls when bulk access is
+denied. It writes inspected listing evidence to
+`ebay-resolution-ledger.csv.gz` and never replaces exact marketplace
+confirmation with synthetic data. When `--max-ebay-lookups` bounds the run,
+eligible GTINs are selected by stable hash rather than numeric order.
 
 ## Open box and refurbished
 

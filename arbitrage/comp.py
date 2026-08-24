@@ -124,7 +124,7 @@ class EbayComp:
                 "EBAY_CLIENT_SECRET")
         mkt = MARKETPLACE.get(region, "EBAY_GB")
         key = hashlib.sha1(
-            f"gtin-v2|{mkt}|{gtin}|{limit}|{detail_limit}|"
+            f"gtin-v3|{mkt}|{gtin}|{limit}|{detail_limit}|"
             f"{min_market_listings}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
@@ -256,7 +256,16 @@ class EbayComp:
                 "item_ids": ",".join(item_ids[start:start + 20])})
             detail_data = self._browse_json(detail_url, mkt)
             if detail_data is None:
-                detail_failed = True
+                # Some production keysets can search and get one item but do
+                # not have permission for the bulk getItems method.
+                for item_id in item_ids[start:start + 20]:
+                    item_url = BROWSE_ITEMS + urllib.parse.quote(
+                        item_id, safe="")
+                    item_data = self._browse_json(item_url, mkt)
+                    if item_data is None:
+                        detail_failed = True
+                    else:
+                        details.append(self._item_identity(item_data, gtin))
                 continue
             details.extend(self._item_identity(item, gtin)
                            for item in detail_data.get("items", []) or [])
