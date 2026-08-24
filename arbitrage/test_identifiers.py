@@ -176,6 +176,45 @@ class IdentifierTests(unittest.TestCase):
         self.assertFalse(comp.EbayComp._condition_matches(
             "Seller refurbished", "certified_refurbished"))
         self.assertFalse(comp.EbayComp._condition_matches("New", "open_box"))
+        self.assertTrue(comp.EbayComp._condition_matches(
+            "For parts or not working", "for_parts", "7000"))
+
+    def test_liquidation_condition_mapping_is_conservative(self):
+        self.assertEqual(MPN._liquidation_condition_family(
+            "Untested Customer Returns;Used"), "for_parts")
+        self.assertEqual(MPN._liquidation_condition_family("Used"), "used")
+        self.assertEqual(MPN._liquidation_condition_family("Like New"),
+                         "open_box")
+
+    def test_liquidation_exit_audit_freezes_one_gtin_per_model(self):
+        class Ebay:
+            def __init__(self):
+                self.calls = []
+
+            def lookup_gtin(self, gtin, **kwargs):
+                self.calls.append((gtin, kwargs["condition"]))
+                return {"resolution_status": "NOT_FOUND"}
+
+        fields = ["model", "manufacturers", "valid_gtins", "conditions",
+                  "lot_count", "total_quantity"]
+        with tempfile.TemporaryDirectory() as tmp:
+            universe = os.path.join(tmp, "universe.csv")
+            output = os.path.join(tmp, "output.csv.gz")
+            with open(universe, "w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=fields)
+                writer.writeheader()
+                writer.writerow({
+                    "model": "W1", "manufacturers": "Maker",
+                    "valid_gtins": "123456789012;1234567890123",
+                    "conditions": "Untested Customer Returns;Used",
+                    "lot_count": "1", "total_quantity": "2",
+                })
+            ebay = Ebay()
+            result = MPN.run_liquidation_exit_audit(
+                ebay, universe, output)
+        self.assertEqual(ebay.calls, [("123456789012", "for_parts")])
+        self.assertEqual(result["identities"], 1)
+        self.assertFalse(result["advance_economics"])
 
     def test_source_brand_matching_uses_only_approved_families(self):
         self.assertEqual(MPN.source_brand_match("Frigidaire", "Electrolux"),

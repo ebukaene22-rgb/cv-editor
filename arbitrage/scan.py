@@ -561,6 +561,25 @@ def cmd_mpn_manifest_audit(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_liquidation_exit_audit(args):
+    """Resolve the frozen liquidation-first GTIN universe on eBay."""
+    import comp as C
+    import mpn as M
+    ebay = C.EbayComp(db())
+    if ebay.synthetic:
+        sys.exit("liquidation-exit-audit requires eBay credentials")
+    totals = M.run_liquidation_exit_audit(
+        ebay, args.universe, args.out, region=args.ebay_region,
+        min_market_listings=args.min_market_listings)
+    verdict = ("ADVANCE_LOT_ECONOMICS" if totals["advance_economics"]
+               else "KILL_EXIT_RESOLUTION")
+    print(f"liquidation-first universe: {totals['identities']} valid-GTIN identities")
+    print(f"usable exact condition markets: {totals['usable_markets']}/"
+          f"{totals['identities']} ({totals['usable_rate_pct']:.2f}%); "
+          f"verdict: {verdict}")
+    print(f"evidence -> {args.out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -839,6 +858,14 @@ def main():
     mm.add_argument("--out", default="experiments/mpn-manifest-ledger.csv")
     mm.add_argument("--timeout", type=int, default=30)
     mm.set_defaults(fn=cmd_mpn_manifest_audit)
+    le = sub.add_parser("liquidation-exit-audit")
+    le.add_argument("--universe",
+                    default="experiments/mpn-manifest-unmatched-identities.csv")
+    le.add_argument("--out",
+                    default="experiments/liquidation-exit-resolution.csv.gz")
+    le.add_argument("--ebay-region", default="US")
+    le.add_argument("--min-market-listings", type=int, default=3)
+    le.set_defaults(fn=cmd_liquidation_exit_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

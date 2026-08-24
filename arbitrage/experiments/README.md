@@ -111,6 +111,16 @@ condition, UPC, quantity, and price fields. The completed 10-lot result is in
 deterministic non-frozen identities retained separately in
 `mpn-manifest-unmatched-identities.csv`.
 
+Resolve the frozen 80 valid-GTIN liquidation identities against eBay US using
+their conservative source-condition families:
+
+```bash
+python3 scan.py liquidation-exit-audit
+```
+
+The frozen result is recorded in `LIQUIDATION-EXIT-GATE.md`, with machine
+evidence in `liquidation-exit-resolution.csv.gz`.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a

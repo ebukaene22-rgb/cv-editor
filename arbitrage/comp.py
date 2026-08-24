@@ -51,6 +51,7 @@ MARKETPLACE = {"US": "EBAY_US", "GB": "EBAY_GB", "EU": "EBAY_DE",
 CONDITION_IDS = {
     "new": "1000", "open_box": "1500",
     "certified_refurbished": "2000", "used": "3000",
+    "for_parts": "7000",
 }
 
 
@@ -146,7 +147,7 @@ class EbayComp:
         return out
 
     def lookup_gtin(self, gtin, region="GB", limit=50, detail_limit=50,
-                    min_market_listings=3):
+                    min_market_listings=3, condition=None):
         """Search active listings by exact GTIN; never synthesize identity."""
         if self.synthetic:
             raise RuntimeError(
@@ -154,7 +155,7 @@ class EbayComp:
                 "EBAY_CLIENT_SECRET")
         mkt = marketplace_id(region)
         key = hashlib.sha1(
-            f"gtin-v3|{mkt}|{gtin}|{limit}|{detail_limit}|"
+            f"gtin-v4|{mkt}|{gtin}|{condition}|{limit}|{detail_limit}|"
             f"{min_market_listings}".encode()).hexdigest()
         row = self.conn.execute(
             "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
@@ -162,7 +163,7 @@ class EbayComp:
             self.cache_hits += 1
             return json.loads(row[1])
         out = self._live_gtin(
-            gtin, mkt, limit, detail_limit, min_market_listings)
+            gtin, mkt, limit, detail_limit, min_market_listings, condition)
         if out is not None:
             self.conn.execute("INSERT OR REPLACE INTO comps VALUES (?,?,?)",
                               (key, time.time(), json.dumps(out)))
@@ -305,10 +306,14 @@ class EbayComp:
         }
 
     def _live_gtin(self, gtin, mkt, limit, detail_limit,
-                   min_market_listings):
+                   min_market_listings, condition=None):
+        if condition is not None and condition not in CONDITION_IDS:
+            raise ValueError(f"unsupported condition family {condition!r}")
+        condition_id = CONDITION_IDS.get(condition, CONDITION_IDS["new"])
         url = BROWSE + "?" + urllib.parse.urlencode({
             "gtin": gtin, "limit": str(limit),
-            "filter": "buyingOptions:{FIXED_PRICE},conditions:{NEW}"})
+            "filter": ("buyingOptions:{FIXED_PRICE},conditionIds:{" +
+                       condition_id + "}")})
         data = self._browse_json(url, mkt)
         if data is None:
             return None
@@ -336,7 +341,11 @@ class EbayComp:
             details.extend(self._item_identity(item, gtin)
                            for item in detail_data.get("items", []) or [])
 
-        exact_items = [item for item in details if item["exact_gtin"]]
+        gtin_items = [item for item in details if item["exact_gtin"]]
+        exact_items = [item for item in gtin_items
+                       if condition is None or self._condition_matches(
+                           item.get("condition"), condition,
+                           item.get("condition_id"))]
         ambiguous_fields = []
         for field in ("brand", "mpn", "model", "size", "color", "pack",
                       "category", "lot_size"):
@@ -363,7 +372,11 @@ class EbayComp:
         return {
             "gtin": gtin, "n": int(data.get("total", len(summaries))),
             "returned": len(summaries), "inspected": len(details),
-            "exact_gtin_items": len(exact_items), "coherent": coherent,
+            "exact_gtin_items": len(gtin_items),
+            "exact_condition_gtin_items": len(exact_items),
+            "condition_family": condition or "new",
+            "coherent_depth": len(exact_items) if coherent else 0,
+            "coherent": coherent,
             "usable_market": usable, "resolution_status": status,
             "ambiguous_fields": ambiguous_fields,
             "median": statistics.median(prices) if prices else None,

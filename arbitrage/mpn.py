@@ -75,6 +75,15 @@ MANIFEST_FIELDS = [
     "identity_status", "audited_at",
 ]
 
+LIQUIDATION_EXIT_FIELDS = [
+    "model", "manufacturer", "gtin", "source_conditions",
+    "condition_family", "manifest_lot_count", "manifest_quantity",
+    "audited_at", "ebay_region", "active_total", "returned", "inspected",
+    "exact_gtin_items", "exact_condition_gtin_items", "coherent_depth",
+    "usable_market", "resolution_status", "median_price", "p25_price",
+    "p75_price", "currency", "economics_status", "unresolved_inputs",
+]
+
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
     "washer": "appliance", "dryer": "appliance",
@@ -577,4 +586,71 @@ def run_manifest_audit(urls, resolution_path, out_path, timeout=30):
         "matched_identities": len(exact_ids),
         "coverage_gate_passed": len(exact_ids) >= 3,
         "sample_sufficient": len(lot_ids) >= 10,
+    }
+
+
+def _liquidation_condition_family(conditions):
+    values = {value.strip() for value in conditions.split(";") if value.strip()}
+    if "Untested Customer Returns" in values:
+        return "for_parts"
+    if "Used" in values:
+        return "used"
+    if values & {"Open Box Like New", "Like New"}:
+        return "open_box"
+    raise ValueError(f"unsupported liquidation conditions {conditions!r}")
+
+
+def run_liquidation_exit_audit(ebay, universe_path, out_path, region="US",
+                               min_market_listings=3):
+    """Resolve the frozen liquidation-first GTIN universe by source condition."""
+    universe = [row for row in _read_csv(universe_path)
+                if row.get("valid_gtins")]
+    audited_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    output = []
+    for row in universe:
+        gtins = row["valid_gtins"].split(";")
+        gtin = min(gtins, key=lambda value: (len(value), value))
+        condition = _liquidation_condition_family(row["conditions"])
+        result = ebay.lookup_gtin(
+            gtin, region=region, limit=10, detail_limit=10,
+            min_market_listings=min_market_listings,
+            condition=condition) or {"resolution_status": "API_ERROR"}
+        usable = bool(result.get("usable_market"))
+        output.append({
+            "model": row["model"], "manufacturer": row["manufacturers"],
+            "gtin": gtin, "source_conditions": row["conditions"],
+            "condition_family": condition,
+            "manifest_lot_count": row["lot_count"],
+            "manifest_quantity": row["total_quantity"],
+            "audited_at": audited_at, "ebay_region": region,
+            "active_total": result.get("n", 0),
+            "returned": result.get("returned", 0),
+            "inspected": result.get("inspected", 0),
+            "exact_gtin_items": result.get("exact_gtin_items", 0),
+            "exact_condition_gtin_items": result.get(
+                "exact_condition_gtin_items", 0),
+            "coherent_depth": result.get("coherent_depth", 0),
+            "usable_market": int(usable),
+            "resolution_status": result.get("resolution_status", "API_ERROR"),
+            "median_price": result.get("median") or "",
+            "p25_price": result.get("p25") or "",
+            "p75_price": result.get("p75") or "",
+            "currency": result.get("currency") or "",
+            "economics_status": ("READY_FOR_LOT_ECONOMICS" if usable
+                                 else "REJECT_EXIT_RESOLUTION"),
+            "unresolved_inputs": ("sold_velocity;condition_sellable_rate;"
+                                  "buyer_premium;freight;sales_tax;ebay_fee;"
+                                  "outbound_postage;manifest_accuracy_haircut"),
+        })
+    opener = gzip.open if str(out_path).endswith(".gz") else open
+    with opener(out_path, "wt", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=LIQUIDATION_EXIT_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    usable = sum(row["usable_market"] for row in output)
+    return {
+        "identities": len(output), "usable_markets": usable,
+        "usable_rate_pct": 100 * usable / len(output) if output else 0,
+        "advance_economics": usable >= 3,
     }
