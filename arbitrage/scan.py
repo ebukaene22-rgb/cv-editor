@@ -37,7 +37,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(HERE, "prices.db")
+DB = os.environ.get("ARBITRAGE_DB", os.path.join(HERE, "prices.db"))
 STORES = os.path.join(HERE, "stores.txt")
 
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -420,6 +420,32 @@ def cmd_measure(args):
         print(f"{name}: {totals[name]:,} ({rate:.2f} per 10k SKU-days)")
 
 
+def cmd_identity_audit(args):
+    """Measure exact identifier coverage; optionally resolve GTINs on eBay."""
+    import identifiers as ID
+    conn = db()
+    ebay = None
+    if args.resolve_ebay:
+        import comp as C
+        ebay = C.EbayComp(conn)
+        if ebay.synthetic:
+            sys.exit("--resolve-ebay requires EBAY_CLIENT_ID and EBAY_CLIENT_SECRET")
+    totals = ID.run_audit(
+        conn, load_stores(), args.out, args.ledger_out,
+        sample_per_store=args.sample_per_store, delay=args.delay,
+        timeout=args.timeout, only_domain=args.only_domain, ebay=ebay,
+        ebay_region=args.ebay_region,
+        max_ebay_lookups=args.max_ebay_lookups, workers=args.workers,
+        retries=args.retries)
+    print(f"identity audit: {totals['domains']} stores, "
+          f"{totals['products_succeeded']}/{totals['products_requested']} "
+          f"product endpoints succeeded")
+    print(f"variants: {totals['variants']:,}; valid GTINs: "
+          f"{totals['valid_gtins']:,} ({totals['gtin_coverage_pct']:.2f}%)")
+    print(f"coverage matrix -> {args.out}")
+    print(f"evidence ledger -> {args.ledger_out}")
+
+
 def cmd_openbox_cohort(args):
     """Generate the bounded condition-matched open-box/refurb review sheet."""
     import experiments as E
@@ -638,6 +664,19 @@ def main():
     m.add_argument("--review-out", default="experiments/scarcity-review.csv")
     m.add_argument("--review-n", type=int, default=20)
     m.set_defaults(fn=cmd_measure)
+    ia = sub.add_parser("identity-audit")
+    ia.add_argument("--sample-per-store", type=int, default=5)
+    ia.add_argument("--out", default="experiments/identity-coverage.csv")
+    ia.add_argument("--ledger-out", default="experiments/identity-ledger.csv.gz")
+    ia.add_argument("--only-domain")
+    ia.add_argument("--delay", type=float, default=0.15)
+    ia.add_argument("--timeout", type=int, default=20)
+    ia.add_argument("--workers", type=int, default=4)
+    ia.add_argument("--retries", type=int, default=2)
+    ia.add_argument("--resolve-ebay", action="store_true")
+    ia.add_argument("--ebay-region", default="GB")
+    ia.add_argument("--max-ebay-lookups", type=int, default=100)
+    ia.set_defaults(fn=cmd_identity_audit)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")

@@ -36,6 +36,7 @@ import statistics
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 
 OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
@@ -113,6 +114,26 @@ class EbayComp:
             self.conn.commit()
         return out
 
+    def lookup_gtin(self, gtin, region="GB", limit=50):
+        """Search active listings by exact GTIN; never synthesize identity."""
+        if self.synthetic:
+            raise RuntimeError(
+                "exact GTIN resolution requires EBAY_CLIENT_ID and "
+                "EBAY_CLIENT_SECRET")
+        mkt = MARKETPLACE.get(region, "EBAY_GB")
+        key = hashlib.sha1(f"gtin-v1|{mkt}|{gtin}|{limit}".encode()).hexdigest()
+        row = self.conn.execute(
+            "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
+        if row and time.time() - row[0] < COMP_TTL:
+            self.cache_hits += 1
+            return json.loads(row[1])
+        out = self._live_gtin(gtin, mkt, limit)
+        if out is not None:
+            self.conn.execute("INSERT OR REPLACE INTO comps VALUES (?,?,?)",
+                              (key, time.time(), json.dumps(out)))
+            self.conn.commit()
+        return out
+
     def _live(self, query, mkt, limit):
         url = BROWSE + "?" + urllib.parse.urlencode({
             "q": query[:100], "limit": str(limit),
@@ -154,11 +175,52 @@ class EbayComp:
                 "items": items,
                 "ids": [i["id"] for i in items if i.get("id")]}
 
+    def _live_gtin(self, gtin, mkt, limit):
+        url = BROWSE + "?" + urllib.parse.urlencode({
+            "gtin": gtin, "limit": str(limit),
+            "filter": "buyingOptions:{FIXED_PRICE}"})
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Bearer {self.token()}",
+            "X-EBAY-C-MARKETPLACE-ID": mkt,
+            "Accept-Encoding": "gzip"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw = response.read()
+                if response.headers.get("Content-Encoding") == "gzip":
+                    raw = gzip.decompress(raw)
+                data = json.loads(raw.decode())
+        except urllib.error.HTTPError as error:
+            if error.code == 429:
+                time.sleep(2)
+            return None
+        except Exception:
+            return None
+        self.calls += 1
+        items, exact = [], 0
+        for item in data.get("itemSummaries", []) or []:
+            reported = item.get("gtin")
+            if isinstance(reported, str):
+                reported = [reported]
+            reported = ["".join(ch for ch in str(value) if ch.isdigit())
+                        for value in (reported or [])]
+            is_exact = gtin in reported
+            exact += int(is_exact)
+            price = item.get("price") or {}
+            items.append({
+                "id": item.get("itemId"), "title": item.get("title") or "",
+                "gtins": reported, "exact_gtin": is_exact,
+                "price": price.get("value"), "currency": price.get("currency"),
+            })
+        return {
+            "gtin": gtin, "n": int(data.get("total", len(items))),
+            "returned": len(items), "exact_gtin_items": exact,
+            "items": items, "synthetic": False,
+        }
+
     @staticmethod
     def _synthetic(query, mkt):
         """Deterministic stub so ranking can be tested without a keyset."""
         h = int(hashlib.sha1(f"{mkt}|{query}".encode()).hexdigest()[:8], 16)
         return {"median": 20 + h % 180, "p25": 15 + h % 140,
                 "n": 1 + h % 400, "currency": "USD", "synthetic": True}
-
 

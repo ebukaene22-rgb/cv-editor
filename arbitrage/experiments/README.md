@@ -12,6 +12,23 @@ source cycle or a new replenishment. Fill the marketplace and economics fields.
 Pass only if at least 10% are exact-identity, marketplace-scarce opportunities
 and at least one survives full contribution economics.
 
+## Deterministic identity
+
+`identity-coverage.csv` is the store/category coverage matrix and
+`identity-ledger.csv.gz` is the variant-level evidence. The audit samples a
+stable five-product panel per Shopify storefront, validates GTIN check digits,
+and flags GTINs reused across variants. Read `IDENTITY-AUDIT.md` before using
+the result as a sourcing filter.
+
+Regenerate it from a rebuilt database with:
+
+```bash
+python3 scan.py identity-audit
+```
+
+Add `--resolve-ebay` only when `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` are
+set. Exact marketplace confirmation is never replaced with synthetic data.
+
 ## Open box and refurbished
 
 `openbox-cohort.csv` contains 30 in-stock products whose source titles state a
