@@ -5,10 +5,9 @@ resolution, or mechanism scoring.
 
 Promoted to a core experimental rule after the small-goods liquidation KILL
 (experiments/UNIT-VALUE-FLOOR.md). Fees and fulfilment are near-fixed per
-unit while margin scales with price, so below a computable exit price the
-contribution target is unreachable AT ANY acquisition discount. Screening
-on that first prevents re-testing the same economic failure under a new
-mechanism label.
+unit while margin scales with price, so each assumed acquisition ratio has a
+computable minimum exit price. Screening on that first prevents re-testing the
+same economic failure under a new mechanism label.
 
 Usage:
     floor_exit_price(target_cm=15, ship=5)      -> minimum exit price
@@ -26,7 +25,7 @@ PREFAIL_MEDIAN_EXIT = 30.0  # cohort-level tripwire
 def floor_exit_price(target_cm=DEFAULT_TARGET_CM, ship=DEFAULT_SHIP,
                      seller_country="AE", category="default",
                      buy_to_exit=BUY_TO_EXIT):
-    """Minimum exit price at which target_cm is achievable at all."""
+    """Minimum exit price at the supplied buy-to-exit assumption."""
     lo, hi = 1.0, 5000.0
     for _ in range(60):
         mid = (lo + hi) / 2

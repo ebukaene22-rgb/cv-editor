@@ -148,6 +148,11 @@ whose source titles state a secondary condition. The current monitored source
 universe produced only 1/30 qualifying rows, so the cohort is not yet sent to
 market resolution. See `OPENBOX-UNIT-VALUE-GATE.md`.
 
+A separate 30-row, high-value Reboxed cohort is recorded in
+`OPENBOX-REFURB-GATE.md`. It produced 0/30 viable rows and kills professional
+refurbisher retail as the acquisition source; it does not replace the requested
+GBP 50-200 manufacturer-outlet/direct-source test.
+
 Pass at 3/30 robust opportunities with contribution margin at least 15% and
 median verification time no more than 8 minutes.
 
