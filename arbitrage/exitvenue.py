@@ -381,7 +381,9 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
                         confirmed, tier = lwhy, "site_link"
                         break
         row["present"] = "confirmed_active" if confirmed else "candidate_active"
-        # a non-confirming tier is still evidence worth carrying
+        # A non-confirming tier is still carried: no_match and
+        # legal_info_unavailable both leave the row candidate_active and mean
+        # opposite things, so neither may be flattened to blank.
         row["identity_evidence"] = confirmed or (f"{tier}: {why}" if tier
                                                  else why)
         row["identity_tier"] = tier or ""
@@ -490,7 +492,26 @@ def main(argv=None):
         print(f"CANDIDATE active : {tally['candidate_active']}/{resolved} "
               f"({tally['candidate_active']/resolved:.1%})  "
               f"-- identity NOT established", file=sys.stderr)
-    print("all figures are LOWER BOUNDS on presence", file=sys.stderr)
+
+    # Why the candidates are unconfirmed decides what a low confirmation rate
+    # means. no_match says these sellers are probably not the source;
+    # legal_info_unavailable says the experiment could not tell. Never report
+    # one number for both.
+    power = legalid.resolving_power(
+        [r.get("identity_tier") or "" for r in rows
+         if r["present"] in ("confirmed_active", "candidate_active")])
+    if any(power.values()):
+        print("\nidentity evidence among active rows:", file=sys.stderr)
+        for k in ("confirmed", "corroborated", "supporting", "no_match",
+                  "unavailable"):
+            print(f"  {k:14} {power[k]:>4}", file=sys.stderr)
+        if power["unavailable"] > power["no_match"]:
+            print("  -> dominated by UNAVAILABLE: low resolving power, "
+                  "NOT evidence against ownership", file=sys.stderr)
+        elif power["no_match"]:
+            print("  -> no_match present: real evidence against first-party "
+                  "ownership for those rows", file=sys.stderr)
+    print("\nall figures are LOWER BOUNDS on presence", file=sys.stderr)
     if inc:
         print(f"INCONCLUSIVE (API errors, excluded): {inc} "
               f"-- re-run with --resume", file=sys.stderr)

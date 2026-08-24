@@ -80,9 +80,9 @@ class Hierarchy(unittest.TestCase):
 class AbsenceIsNotRefutation(unittest.TestCase):
     def test_missing_block_is_unavailable_not_rejection(self):
         obs = legalid.extract({"seller": {"username": "itinstock"}})
-        tier, why = legalid.evaluate(obs, ITINSTOCK)
-        self.assertIsNone(tier)
-        self.assertEqual(why, "legal_info_unavailable")
+        tier, _ = legalid.evaluate(obs, ITINSTOCK)
+        self.assertEqual(tier, legalid.UNAVAILABLE)
+        self.assertFalse(legalid.is_confirming(tier))
 
     def test_one_bare_listing_does_not_close_the_route(self):
         # fields are conditional: sample several before concluding
@@ -95,17 +95,52 @@ class AbsenceIsNotRefutation(unittest.TestCase):
     def test_all_bare_reports_unavailable_with_sample_size(self):
         obs = [legalid.extract({"seller": {"username": "x"}})] * 3
         tier, why = legalid.best_of(obs, ITINSTOCK)
-        self.assertIsNone(tier)
-        self.assertIn("unavailable", why)
+        self.assertEqual(tier, legalid.UNAVAILABLE)
         self.assertIn("3", why)
+        self.assertIn("NOT evidence against", why)
 
-    def test_published_but_mismatched_is_distinguished(self):
+    def test_published_but_mismatched_is_a_different_state(self):
         obs = legalid.extract(item(name="Totally Different Co",
                                    registrationNumber="99999999"))
         tier, why = legalid.evaluate(obs, ITINSTOCK)
-        self.assertIsNone(tier)
-        self.assertNotIn("unavailable", why)
-        self.assertIn("different entity", why)
+        self.assertEqual(tier, legalid.NO_MATCH)
+        self.assertIn("against first-party", why)
+
+    def test_no_match_and_unavailable_never_collapse(self):
+        """The whole point: both leave a row candidate_active and they mean
+        opposite things, so they must never share a value."""
+        bare = legalid.extract({"seller": {"username": "x"}})
+        mism = legalid.extract(item(name="Other Co",
+                                    registrationNumber="99999999"))
+        a, _ = legalid.best_of([bare] * 3, ITINSTOCK)
+        b, _ = legalid.best_of([mism] * 3, ITINSTOCK)
+        self.assertNotEqual(a, b)
+        self.assertEqual(a, legalid.UNAVAILABLE)
+        self.assertEqual(b, legalid.NO_MATCH)
+        for t in (a, b):
+            self.assertFalse(legalid.is_confirming(t))
+            self.assertIn(t, legalid.NON_EVIDENCE)
+
+    def test_any_published_block_outranks_bare_listings(self):
+        # a seller that publishes details is resolvable even if unmatched
+        bare = legalid.extract({"seller": {"username": "x"}})
+        mism = legalid.extract(item(name="Other Co",
+                                    registrationNumber="99999999"))
+        self.assertEqual(legalid.best_of([bare, mism], ITINSTOCK)[0],
+                         legalid.NO_MATCH)
+
+
+class ResolvingPower(unittest.TestCase):
+    def test_breakdown_separates_the_two_negatives(self):
+        got = legalid.resolving_power(
+            ["registration", "vat", "name_address", "name",
+             legalid.NO_MATCH, legalid.UNAVAILABLE, legalid.UNAVAILABLE])
+        self.assertEqual(got, {"confirmed": 2, "corroborated": 1,
+                               "supporting": 1, "no_match": 1,
+                               "unavailable": 2})
+
+    def test_empty_population(self):
+        self.assertEqual(sum(legalid.resolving_power([]).values()), 0)
 
     def test_best_of_prefers_strongest_tier(self):
         obs = [legalid.extract(item(name="IT In Stock Ltd")),

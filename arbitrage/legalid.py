@@ -122,8 +122,26 @@ def norm_postcode(s):
 
 # --- evidence -------------------------------------------------------------
 
+# Positive evidence, strongest first. Only these participate in ranking.
 TIERS = ("registration", "vat", "name_address", "name")
 CONFIRMING = ("registration", "vat")
+
+# Two NON-evidence outcomes. Both leave a row at candidate_active, and they
+# mean opposite things -- so they are first-class values, never a shared
+# None:
+#
+#   no_match               the seller publishes legal details and none match
+#                          the source. Evidence AGAINST first-party ownership.
+#   legal_info_unavailable no legal block on any sampled listing. Says
+#                          nothing about ownership; says the experiment had
+#                          no resolving power here.
+#
+# A candidate population dominated by no_match is a finding. One dominated by
+# legal_info_unavailable is an instrument limitation wearing a finding's
+# clothes. Reporting them as one number hides which of those you have.
+NO_MATCH = "no_match"
+UNAVAILABLE = "legal_info_unavailable"
+NON_EVIDENCE = (NO_MATCH, UNAVAILABLE)
 
 
 def extract(item):
@@ -167,7 +185,7 @@ def evaluate(observed, expected):
     that as `legal_info_unavailable`, never as a rejection.
     """
     if not observed or not observed.get("available"):
-        return None, "legal_info_unavailable"
+        return UNAVAILABLE, "no legal block published on this listing"
 
     if company_match(observed.get("registrationNumber"),
                      expected.get("registrationNumber")):
@@ -188,8 +206,8 @@ def evaluate(observed, expected):
     if nm:
         return "name", (f"legal name '{observed['name']}' matches, address "
                         f"unconfirmed -- supporting evidence only")
-    return None, ("legal info published but nothing matches the source -- "
-                  "likely a different entity")
+    return NO_MATCH, ("legal info published but nothing matches the source "
+                      "-- evidence against first-party ownership")
 
 
 def best_of(observations, expected):
@@ -205,17 +223,47 @@ def best_of(observations, expected):
         if obs.get("available"):
             any_available = True
         tier, why = evaluate(obs, expected)
-        if tier and (best_tier is None
-                     or TIERS.index(tier) < TIERS.index(best_tier)):
+        if tier in TIERS and (best_tier is None
+                              or TIERS.index(tier) < TIERS.index(best_tier)):
             best_tier, best_why = tier, why
     if best_tier:
         return best_tier, best_why
+    n = len(observations or [])
     if not any_available:
-        return None, (f"legal_info_unavailable across "
-                      f"{len(observations or [])} sampled listings")
-    return None, "legal info published but nothing matched the source"
+        return UNAVAILABLE, (f"no legal block on any of {n} sampled listings "
+                             f"-- no resolving power here, NOT evidence "
+                             f"against ownership")
+    return NO_MATCH, (f"legal info published across {n} sampled listings, "
+                      f"none matching the source")
 
 
 def is_confirming(tier):
     """Only registration/VAT may promote a row to confirmed_active."""
     return tier in CONFIRMING
+
+
+def resolving_power(tiers):
+    """
+    Summarise a candidate population by what the evidence actually says.
+
+    -> {'confirmed','corroborated','supporting','no_match','unavailable'}
+
+    Read `no_match` against `unavailable` before drawing any conclusion from
+    a low confirmation rate: the first says these sellers are probably not
+    the source, the second says the experiment could not tell.
+    """
+    out = dict.fromkeys(
+        ("confirmed", "corroborated", "supporting", "no_match",
+         "unavailable"), 0)
+    for t in tiers:
+        if t in CONFIRMING:
+            out["confirmed"] += 1
+        elif t == "name_address":
+            out["corroborated"] += 1
+        elif t == "name":
+            out["supporting"] += 1
+        elif t == NO_MATCH:
+            out["no_match"] += 1
+        elif t == UNAVAILABLE:
+            out["unavailable"] += 1
+    return out

@@ -79,7 +79,22 @@ Evidence hierarchy, strongest first:
 | `vat` | VAT matches after normalisation | **confirming** |
 | `name_address` | legal name AND postcode match | strong, not confirming |
 | `name` | legal name alone | supporting only |
-| none | handle morphology, branded titles | candidate only |
+| `no_match` | details published, none match | **evidence AGAINST ownership** |
+| `legal_info_unavailable` | no legal block on any sampled listing | **no resolving power** |
+
+### Required in the results table: `no_match` vs `legal_info_unavailable`
+
+Both leave a row at `candidate_active`, and analytically they are opposites.
+A candidate population dominated by `no_match` is a finding — those sellers
+publish legal details that are not the source's, which is evidence against
+first-party ownership. A population dominated by `legal_info_unavailable` is
+an instrument limitation wearing a finding's clothes: the experiment simply
+could not resolve those rows.
+
+Reporting one "unconfirmed" number for both hides which of the two you have,
+and a low confirmation rate is uninterpretable without the split. They are
+distinct values in `identity_tier`, never a shared blank, and
+`legalid.resolving_power()` prints the breakdown at the end of every run.
 
 Names and addresses need fuzzy matching, and fuzzy matching invites exactly
 the false positives presence detection cannot afford — hence only the two
