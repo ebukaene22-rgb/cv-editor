@@ -31,13 +31,25 @@ That reported **itinstock -- the one source known for certain to run an eBay
 store -- as absent**, because no itinstock listing has "itinstock" in its
 title. Categories, not keywords.
 
-## Three outcomes, not two
+## Four outcomes, and why the fourth exists
 
     active        handle recognised AND holding live listings
     dormant       handle recognised but no listings in any probed category
     not_detected  no candidate handle recognised by eBay
+    inconclusive  one or more probes errored -- NOTHING is claimed
 
-The headline rate counts `active` only.
+The headline rate counts `active` over the rows that actually resolved;
+`inconclusive` rows are excluded from the denominator, never scored as
+absence.
+
+The first full sweep earned that fourth state. It exhausted the daily Browse
+quota at ~2,488 calls and the last 21 domains came back all-HTTP-429. An
+errored probe was being treated as "handle not real", so quota exhaustion
+printed as `not_detected` -- itinstock, with 18,839 live listings confirmed
+minutes earlier, reported as absent from the exit venue. Same fail-open shape
+as eBay's dropped seller filter and as the self-comp bug: a failure that
+renders as a confident negative. A run now aborts once the error rate crosses
+`MAX_ERROR_RATE` rather than emitting a mostly-invented CSV.
 
 An earlier version required a listing whose TITLE contained the brand name.
 Calibration killed that rule: it marked itinstock -- 18,839 live listings, and
@@ -103,6 +115,9 @@ SUFFIXES = ("", "-uk", "uk", "-us", "us", "official", "-official",
             "outlet", "-outlet", "direct")
 
 WORKERS = 8
+
+# Abort rather than emit a CSV whose negatives are really API failures.
+MAX_ERROR_RATE = 0.25
 
 
 def brand_core(domain):
@@ -212,7 +227,7 @@ def probe_domain(api, domain, region, verbose=True):
     # --- 1. which candidate handles does eBay recognise? ------------------
     # A dropped-filter probe scans the whole category (~4.3s server-side), so
     # these run concurrently; eBay's quota is per-day, not per-second.
-    real = []
+    real, errors = [], 0
     with futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
         jobs = {pool.submit(seller_probe, api, core + suf, EXISTENCE_CAT,
                             mkt, 1): core + suf for suf in SUFFIXES}
@@ -222,6 +237,7 @@ def probe_domain(api, domain, region, verbose=True):
             if state == "honoured":
                 real.append(handle)
             elif state == "error":
+                errors += 1
                 notes.append(f"{handle}:error")
     real.sort(key=len)
 
@@ -245,6 +261,8 @@ def probe_domain(api, domain, region, verbose=True):
         for fut in futures.as_completed(jobs):
             _, label = jobs[fut]
             state, n, titles = fut.result()
+            if state == "error":
+                errors += 1
             if state != "honoured" or not n:
                 continue
             total_listings += n
@@ -256,12 +274,17 @@ def probe_domain(api, domain, region, verbose=True):
                     break
     where.sort()
 
-    if not real:
+    # An errored probe proves nothing. Never let an API failure render as
+    # absence -- that is what reported itinstock as not_detected.
+    if errors and not total_listings:
+        row["present"] = "inconclusive"
+    elif not real:
         row["present"] = "not_detected"
     elif total_listings > 0:
         row["present"] = "active"
     else:
         row["present"] = "dormant"
+    row["errors"] = errors
 
     row["brand_in_titles"] = "yes" if attributed else "no"
     row["handles"] = "|".join(real)
@@ -296,6 +319,9 @@ def main(argv=None):
     ap.add_argument("--out",
                     default="arbitrage/experiments/exit-venue-overlap.csv")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--resume", action="store_true",
+                    help="keep resolved rows in --out, re-probe only "
+                         "inconclusive/missing ones")
     a = ap.parse_args(argv)
 
     doms = read_stores(a.stores)
@@ -307,13 +333,37 @@ def main(argv=None):
     if a.limit:
         doms = doms[:a.limit]
 
+    prior = {}
+    if a.resume and os.path.exists(a.out):
+        for r in csv.DictReader(open(a.out)):
+            if r.get("present") not in (None, "", "inconclusive"):
+                prior[r["domain"]] = r
+        print(f"resume: {len(prior)} rows already resolved", file=sys.stderr)
+
     api = Browse()
-    print(f"probing {len(doms)} domains", file=sys.stderr)
-    rows = [probe_domain(api, d, r) for d, r in doms]
+    todo = [(d, r) for d, r in doms if d not in prior]
+    print(f"probing {len(todo)} domains", file=sys.stderr)
+    rows, errored = [], 0
+    for d, r in doms:
+        if d in prior:
+            rows.append(prior[d])
+            continue
+        row = probe_domain(api, d, r)
+        rows.append(row)
+        errored += 1 if row["present"] == "inconclusive" else 0
+        done = len(rows) - len(prior)
+        if done >= 8 and errored / done > MAX_ERROR_RATE:
+            print(f"\nABORT: {errored}/{done} domains inconclusive -- the API "
+                  f"is failing, not the sources. Partial results written; "
+                  f"re-run with --resume.", file=sys.stderr)
+            for d2, r2 in doms[len(rows):]:
+                rows.append({"domain": d2, "region": r2,
+                             "present": "inconclusive", "notes": "not probed"})
+            break
 
     cols = ["domain", "region", "brand_core", "marketplace", "present",
             "brand_in_titles", "handles", "listings", "categories",
-            "sample_title", "notes"]
+            "errors", "sample_title", "notes"]
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols)
@@ -323,12 +373,18 @@ def main(argv=None):
 
     act = sum(1 for r in rows if r["present"] == "active")
     dorm = sum(1 for r in rows if r["present"] == "dormant")
-    selfb = sum(1 for r in rows
-                if r["present"] == "active" and r["brand_in_titles"] == "yes")
-    print(f"\nACTIVE in exit venue : {act}/{len(rows)} "
-          f"({act/len(rows):.0%})  -- LOWER BOUND", file=sys.stderr)
+    inc = sum(1 for r in rows if r["present"] == "inconclusive")
+    selfb = sum(1 for r in rows if r["present"] == "active"
+                and r.get("brand_in_titles") == "yes")
+    resolved = len(rows) - inc
+    if resolved:
+        print(f"\nACTIVE in exit venue : {act}/{resolved} "
+              f"({act/resolved:.0%})  -- LOWER BOUND", file=sys.stderr)
     print(f"  of which self-branded in titles: {selfb}", file=sys.stderr)
     print(f"handle recognised but dormant   : {dorm}", file=sys.stderr)
+    if inc:
+        print(f"INCONCLUSIVE (API errors, excluded): {inc} "
+              f"-- re-run with --resume", file=sys.stderr)
     print(f"eBay calls: {api.calls}  ->  {a.out}", file=sys.stderr)
     return rows
 

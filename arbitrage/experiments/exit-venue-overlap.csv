@@ -1,0 +1,75 @@
+domain,region,brand_core,marketplace,present,brand_in_titles,handles,listings,categories,errors,sample_title,notes
+www.allbirds.com,US,allbirds,EBAY_US,dormant,no,allbirds,0,,,,
+www.allbirds.co.uk,GB,allbirds,EBAY_GB,dormant,no,allbirds,0,,,,
+www.allbirds.eu,EU,allbirds,EBAY_DE,dormant,no,allbirds,0,,,,
+www.allbirds.ca,CA,allbirds,EBAY_CA,dormant,no,allbirds,0,,,,
+kith.com,US,kith,EBAY_US,dormant,no,kith|kithuk|kithshop|kithstore,0,,,,
+www.deathwishcoffee.com,US,deathwishcoffee,EBAY_US,dormant,no,deathwishcoffee,0,,,,
+www.beardbrand.com,US,beardbrand,EBAY_US,not_detected,no,,0,,,,
+drinkolipop.com,US,drinkolipop,EBAY_US,not_detected,no,,0,,,,
+www.redbullshopus.com,US,redbullshopus,EBAY_US,not_detected,no,,0,,,,
+www.tinywoodstove.com,US,tinywoodstove,EBAY_US,not_detected,no,,0,,,,
+gymshark.com,US,gymshark,EBAY_US,active,yes,gymshark|gymshark-store|hidie_gymshark,64,Clothing/Shoes:1;Clothing/Shoes:63,,Gymshark Onyx V5 Midnight Long Sleeve,
+www.taylorstitch.com,US,taylorstitch,EBAY_US,dormant,no,taylorstitch,0,,,,
+www.brooklinen.com,US,brooklinen,EBAY_US,not_detected,no,,0,,,,
+www.tentree.com,US,tentree,EBAY_US,dormant,no,tentree,0,,,,
+www.vessi.com,US,vessi,EBAY_US,not_detected,no,,0,,,,
+www.colourpop.com,US,colourpop,EBAY_US,dormant,no,colourpop|colourpopshop,0,,,,
+jeffreestarcosmetics.com,US,jeffreestarcosmetics,EBAY_US,not_detected,no,,0,,,,
+www.culturekings.com,US,culturekings,EBAY_US,dormant,no,culturekings|culturekingsofficial,0,,,,
+www.ridgewallet.com,US,ridgewallet,EBAY_US,dormant,no,ridgewallet,0,,,,
+www.rhoback.com,US,rhoback,EBAY_US,not_detected,no,,0,,,,
+www.stanley1913.com,US,stanley1913,EBAY_US,dormant,no,stanley1913,0,,,,
+uk.stanley1913.com,GB,stanley1913,EBAY_GB,dormant,no,stanley1913,0,,,,
+www.aloyoga.com,US,aloyoga,EBAY_US,dormant,no,aloyoga,0,,,,
+peakdesign.com,US,peakdesign,EBAY_US,dormant,no,peakdesign,0,,,,
+satechi.net,US,satechi,EBAY_US,dormant,no,satechi,0,,,,
+twelvesouth.com,US,twelvesouth,EBAY_US,not_detected,no,,0,,,,
+nativeunion.com,US,nativeunion,EBAY_US,dormant,no,nativeunion,0,,,,
+fromourplace.com,US,fromourplace,EBAY_US,dormant,no,fromourplace,0,,,,
+fellowproducts.com,US,fellowproducts,EBAY_US,not_detected,no,,0,,,,
+simplemodern.com,US,simplemodern,EBAY_US,dormant,no,simplemodernshop,0,,,,
+brumate.com,US,brumate,EBAY_US,dormant,no,brumate,0,,,,
+bioliteenergy.com,US,bioliteenergy,EBAY_US,not_detected,no,,0,,,,
+thejamesbrand.com,US,thejamesbrand,EBAY_US,dormant,no,thejamesbrand,0,,,,
+gerbergear.com,US,gerbergear,EBAY_US,dormant,no,gerbergear,0,,,,
+gsioutdoors.com,US,gsioutdoors,EBAY_US,not_detected,no,,0,,,,
+goalzero.com,US,goalzero,EBAY_US,dormant,no,goalzero,0,,,,
+fromourplace.co.uk,GB,fromourplace,EBAY_GB,active,no,fromourplace,1,Home & Garden:1,,,
+twelvesouth.co.uk,GB,twelvesouth,EBAY_GB,not_detected,no,,0,,,,
+satechi.co.uk,GB,satechi,EBAY_GB,dormant,no,satechi,0,,,,
+goalzero.co.uk,GB,goalzero,EBAY_GB,dormant,no,goalzero,0,,,,
+brumate.co.uk,GB,brumate,EBAY_GB,dormant,no,brumate,0,,,,
+quadlockcase.com,US,quadlockcase,EBAY_US,not_detected,no,,0,,,,
+rokform.com,US,rokform,EBAY_US,active,yes,rokform,148,Clothing/Shoes:1;Computers/Networking:1;Consumer Electronics:2;Mobile/Comms:140;Sporting Goods:4,,Rokform G-ROK Wireless Portable Bluetooth Golf Speaker Magnetic IPX7 Waterproof,
+adamspolishes.com,US,adamspolishes,EBAY_US,dormant,no,adamspolishes,0,,,,
+chemicalguys.com,US,chemicalguys,EBAY_US,dormant,no,chemicalguys|chemicalguysuk,0,,,,
+thinkcrucial.com,US,thinkcrucial,EBAY_US,not_detected,no,,0,,,,
+kenu.com,US,kenu,EBAY_US,dormant,no,kenushop|kenustore,0,,,,
+nitecorestore.com,US,nitecorestore,EBAY_US,not_detected,no,,0,,,,
+fenix-store.com,US,fenix-store,EBAY_US,dormant,no,fenix-store,0,,,,
+cotopaxi.com,US,cotopaxi,EBAY_US,not_detected,no,,0,,,,
+ember.com,US,ember,EBAY_US,dormant,no,ember|emberus|emberuk|ember-uk|embershop|emberstore|ember-shop,0,,,,
+wandp.com,US,wandp,EBAY_US,not_detected,no,,0,,,,
+klymit.com,US,klymit,EBAY_US,dormant,no,klymit,0,,,,
+hexclad.com,US,hexclad,EBAY_US,inconclusive,no,hexclad,0,,7,,hexcladstore:error;hexclad-shop:error;hexclad-store:error;hexcladshop:error;hexcladoutlet:error;hexclad-outlet:error;hexcladdirect:error;discovery:HTTP 429
+skullcandy.com,US,skullcandy,EBAY_US,inconclusive,no,,0,,15,,skullcandy:error;skullcandy_official:error;skullcandy-official:error;skullcandyus:error;skullcandy-us:error;skullcandy-uk:error;skullcandyuk:error;skullcandystore:error;skullcandy-store:error;skullcandyoutlet:error;skullcandy-shop:error;skullcandydirect:error;skullcandy-outlet:error;skullcandyshop:error;skullcandyofficial:error;discovery:HTTP 429
+jlab.com,US,jlab,EBAY_US,inconclusive,no,,0,,15,,jlab-uk:error;jlab-us:error;jlab-official:error;jlabuk:error;jlabofficial:error;jlab:error;jlab_official:error;jlabus:error;jlab-store:error;jlabstore:error;jlaboutlet:error;jlab-shop:error;jlabdirect:error;jlab-outlet:error;jlabshop:error;discovery:HTTP 429
+rumpl.com,US,rumpl,EBAY_US,inconclusive,no,,0,,15,,rumpl:error;rumplofficial:error;rumpl-uk:error;rumpl-official:error;rumpl_official:error;rumpl-us:error;rumplus:error;rumpl-store:error;rumplshop:error;rumploutlet:error;rumpl-shop:error;rumpl-outlet:error;rumpldirect:error;rumpluk:error;rumplstore:error;discovery:HTTP 429
+thehouseofmarley.com,US,thehouseofmarley,EBAY_US,inconclusive,no,,0,,15,,thehouseofmarley:error;thehouseofmarley-official:error;thehouseofmarleyuk:error;thehouseofmarley-uk:error;thehouseofmarleyus:error;thehouseofmarley-us:error;thehouseofmarleystore:error;thehouseofmarley-store:error;thehouseofmarleyshop:error;thehouseofmarley-outlet:error;thehouseofmarleyoutlet:error;thehouseofmarleydirect:error;thehouseofmarleyofficial:error;thehouseofmarley_official:error;thehouseofmarley-shop:error;discovery:HTTP 429
+umbra.com,US,umbra,EBAY_US,inconclusive,no,,0,,15,,umbra:error;umbra-us:error;umbra_official:error;umbraus:error;umbraofficial:error;umbrauk:error;umbra-official:error;umbrastore:error;umbra-store:error;umbra-outlet:error;umbraoutlet:error;umbra-shop:error;umbrashop:error;umbradirect:error;umbra-uk:error;discovery:HTTP 429
+misen.com,US,misen,EBAY_US,inconclusive,no,,0,,15,,misenuk:error;misenofficial:error;misenus:error;misen-us:error;misen_official:error;misen-uk:error;misen-official:error;misen:error;misenstore:error;misenshop:error;misen-shop:error;misen-store:error;misen-outlet:error;misenoutlet:error;misendirect:error;discovery:HTTP 429
+case-mate.com,US,case-mate,EBAY_US,inconclusive,no,,0,,15,,case-mateuk:error;case-mateus:error;case-mate-us:error;case-mateofficial:error;case-mate:error;case-mate-official:error;case-mate-uk:error;case-mate_official:error;case-matestore:error;case-mate-store:error;case-mateshop:error;case-mate-shop:error;case-mateoutlet:error;case-mate-outlet:error;case-matedirect:error;discovery:HTTP 429
+corkcicle.com,US,corkcicle,EBAY_US,inconclusive,no,,0,,15,,corkcicle:error;corkcicleuk:error;corkcicle-us:error;corkcicle-official:error;corkcicleus:error;corkcicle_official:error;corkcicle-uk:error;corkcicleofficial:error;corkcicle-store:error;corkciclestore:error;corkcicle-shop:error;corkcicleshop:error;corkcicle-outlet:error;corkcicleoutlet:error;corkcicledirect:error;discovery:HTTP 429
+ugmonk.com,US,ugmonk,EBAY_US,inconclusive,no,,0,,15,,ugmonk:error;ugmonkuk:error;ugmonk_official:error;ugmonk-us:error;ugmonk-uk:error;ugmonkus:error;ugmonkstore:error;ugmonkshop:error;ugmonk-shop:error;ugmonkoutlet:error;ugmonk-outlet:error;ugmonkdirect:error;ugmonk-official:error;ugmonkofficial:error;ugmonk-store:error;discovery:HTTP 429
+status.co,US,status,EBAY_US,inconclusive,no,,0,,15,,statusuk:error;statusus:error;status-official:error;status-us:error;statusofficial:error;status:error;statusstore:error;statusshop:error;status-store:error;status-shop:error;statusoutlet:error;statusdirect:error;status_official:error;status-uk:error;status-outlet:error;discovery:HTTP 429
+chromeindustries.com,US,chromeindustries,EBAY_US,inconclusive,no,,0,,15,,chromeindustries:error;chromeindustriesus:error;chromeindustries-official:error;chromeindustriesuk:error;chromeindustries-us:error;chromeindustriesofficial:error;chromeindustries-uk:error;chromeindustries_official:error;chromeindustriesstore:error;chromeindustries-store:error;chromeindustries-shop:error;chromeindustriesoutlet:error;chromeindustries-outlet:error;chromeindustriesdirect:error;chromeindustriesshop:error;discovery:HTTP 429
+hypershop.com,US,hypershop,EBAY_US,inconclusive,no,,0,,15,,hypershop:error;hypershopuk:error;hypershopus:error;hypershop-uk:error;hypershop-official:error;hypershopofficial:error;hypershop-us:error;hypershopstore:error;hypershop-store:error;hypershop-shop:error;hypershopoutlet:error;hypershopshop:error;hypershop-outlet:error;hypershopdirect:error;hypershop_official:error;discovery:HTTP 429
+moft.us,US,moft,EBAY_US,inconclusive,no,,0,,15,,moft:error;moftofficial:error;moft-official:error;moftuk:error;moft-uk:error;moft_official:error;moft-us:error;moftus:error;moftstore:error;moftshop:error;moft-shop:error;moft-outlet:error;moftoutlet:error;moftdirect:error;moft-store:error;discovery:HTTP 429
+materialkitchen.com,US,materialkitchen,EBAY_US,inconclusive,no,,0,,15,,materialkitchenuk:error;materialkitchen-official:error;materialkitchenus:error;materialkitchen-us:error;materialkitchen-uk:error;materialkitchen:error;materialkitchenofficial:error;materialkitchen_official:error;materialkitchenstore:error;materialkitchen-store:error;materialkitchenshop:error;materialkitchen-shop:error;materialkitchenoutlet:error;materialkitchen-outlet:error;materialkitchendirect:error;discovery:HTTP 429
+distilunion.com,US,distilunion,EBAY_US,inconclusive,no,,0,,15,,distilunion:error;distilunionofficial:error;distilunionuk:error;distilunion_official:error;distilunion-us:error;distilunion-official:error;distilunion-uk:error;distilunionshop:error;distilunion-store:error;distilunionstore:error;distilunion-shop:error;distilunionoutlet:error;distilunion-outlet:error;distiluniondirect:error;distilunionus:error;discovery:HTTP 429
+shopbala.com,US,shopbala,EBAY_US,inconclusive,no,,0,,15,,shopbalauk:error;shopbala-us:error;shopbala:error;shopbala-official:error;shopbalaofficial:error;shopbalaus:error;shopbala-uk:error;shopbala_official:error;shopbalastore:error;shopbala-store:error;shopbala-shop:error;shopbaladirect:error;shopbala-outlet:error;shopbalashop:error;shopbalaoutlet:error;discovery:HTTP 429
+www.itinstock.com,GB,itinstock,EBAY_GB,inconclusive,no,,0,,15,,itinstock-us:error;itinstock:error;itinstockuk:error;itinstockofficial:error;itinstockus:error;itinstock-uk:error;itinstock_official:error;itinstock-official:error;itinstock-store:error;itinstockoutlet:error;itinstockshop:error;itinstock-shop:error;itinstock-outlet:error;itinstockdirect:error;itinstockstore:error;discovery:HTTP 429
+www.serverpartdeals.com,US,serverpartdeals,EBAY_US,inconclusive,no,,0,,15,,serverpartdeals:error;serverpartdeals_official:error;serverpartdeals-us:error;serverpartdeals-official:error;serverpartdealsuk:error;serverpartdeals-uk:error;serverpartdealsofficial:error;serverpartdealsus:error;serverpartdeals-store:error;serverpartdeals-shop:error;serverpartdeals-outlet:error;serverpartdealsdirect:error;serverpartdealsshop:error;serverpartdealsstore:error;serverpartdealsoutlet:error;discovery:HTTP 429
+www.tier1online.com,GB,tier1online,EBAY_GB,inconclusive,no,,0,,15,,tier1online-uk:error;tier1onlineuk:error;tier1online:error;tier1onlineus:error;tier1online-us:error;tier1online-official:error;tier1online_official:error;tier1onlineofficial:error;tier1onlinestore:error;tier1onlineshop:error;tier1online-shop:error;tier1online-store:error;tier1onlineoutlet:error;tier1onlinedirect:error;tier1online-outlet:error;discovery:HTTP 429
+reboxed.co.uk,GB,reboxed,EBAY_GB,inconclusive,no,,0,,15,,reboxed-uk:error;reboxedofficial:error;reboxed:error;reboxeduk:error;reboxed-us:error;reboxedus:error;reboxed_official:error;reboxed-official:error;reboxedstore:error;reboxed-store:error;reboxedshop:error;reboxed-shop:error;reboxedoutlet:error;reboxed-outlet:error;reboxeddirect:error;discovery:HTTP 429
