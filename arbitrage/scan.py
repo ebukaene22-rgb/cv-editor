@@ -596,6 +596,8 @@ def cmd_liquidation_resolver_diagnostic(args):
           f"C model unfiltered: {totals['model_unfiltered_hits']}; "
           f"D model condition: {totals['model_condition_hits']}")
     print(f"deterministic markets: {totals['deterministic_markets']}")
+    print(f"category-coherent exact-condition markets eligible for economics: "
+          f"{totals['economics_eligible']}")
     print(f"evidence -> {args.out}")
 
 

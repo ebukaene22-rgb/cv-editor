@@ -234,6 +234,12 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(result["exact_model_items"], 1)
         self.assertTrue(result["usable_market"])
 
+    def test_known_ebay_parts_categories_are_structured_evidence(self):
+        self.assertEqual(MPN.EBAY_US_CATEGORY_NAMES["99697"],
+                         "Washer & Dryer Parts")
+        self.assertEqual(MPN.EBAY_US_CATEGORY_NAMES["116026"],
+                         "Dishwasher Parts")
+
     def test_source_brand_matching_uses_only_approved_families(self):
         self.assertEqual(MPN.source_brand_match("Frigidaire", "Electrolux"),
                          "CORPORATE_BRAND_FAMILY")

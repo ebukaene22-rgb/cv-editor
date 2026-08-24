@@ -34,20 +34,33 @@ retain at least three coherent listings under the specific source condition:
 - LG `DLG7001W`: depth 3;
 - LG `LDPM6762S`: depth 3.
 
+## Category identity correction
+
+The three exact-condition rows do not represent the manifested products. eBay
+US Taxonomy API category tree version 134 identifies category `99697` as
+`Washer & Dryer Parts` and `116026` as `Dishwasher Parts`:
+
+- Samsung `WA55CG7500AE`: Washer & Dryer Parts;
+- LG `DLG7001W`: Washer & Dryer Parts;
+- LG `LDPM6762S`: Dishwasher Parts.
+
+The source manifest lines are whole major appliances. Sellers populated the
+compatible appliance model in structured listing fields on component listings,
+so exact brand + model + condition was necessary but not sufficient identity.
+The automated source-category versus eBay-category rule rejects all three.
+
 ## Decision
 
-**GTIN RESOLVER KILLED; EXACT-MODEL RESOLVER PASSED TO ECONOMICS.**
+**DIAGNOSIS COMPLETE; ZERO CATEGORY-COHERENT CONDITION MARKETS.**
 
 The earlier `KILL_EXIT_RESOLUTION` verdict is withdrawn. The source market is
 not absent: used-market sellers frequently omit structured GTIN while retaining
 structured model identity. Condition semantics explain additional loss but do
 not eliminate the exact-model market.
 
-Only the three exact-condition survivors may enter lot economics. The frozen
-80, identity rules, and condition rules remain unchanged. Buyer premium,
-freight, tax, marketplace fees, outbound postage, expected sellable rate, and
-the 15% manifest-accuracy haircut remain unresolved and must be applied before
-any max-bid decision.
+No identity enters lot economics. Buyer premium, freight, tax, marketplace
+fees, outbound postage, expected sellable rate, and the 15% manifest-accuracy
+haircut cannot rescue a product-identity mismatch and remain unestimated.
 
 ## Evidence
 

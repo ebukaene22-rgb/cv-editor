@@ -85,7 +85,7 @@ LIQUIDATION_EXIT_FIELDS = [
 ]
 
 RESOLVER_DIAGNOSTIC_FIELDS = [
-    "model", "manufacturer", "gtin", "source_conditions",
+    "model", "manufacturer", "gtin", "source_categories", "source_conditions",
     "specific_condition", "broad_condition", "audited_at", "ebay_region",
     "gtin_unfiltered_count", "gtin_condition_count",
     "model_unfiltered_count", "model_condition_count",
@@ -93,10 +93,17 @@ RESOLVER_DIAGNOSTIC_FIELDS = [
     "model_unfiltered_exact_depth", "model_condition_exact_depth",
     "gtin_unfiltered_status", "gtin_condition_status",
     "model_unfiltered_status", "model_condition_status",
-    "dominant_category_id", "returned_condition_ids",
+    "dominant_category_id", "dominant_category_name",
+    "category_identity_coherent", "returned_condition_ids",
     "returned_titles_json", "diagnostic_classification",
-    "deterministic_market_found",
+    "deterministic_market_found", "economics_eligible",
 ]
+
+# Names verified from eBay US Taxonomy API category tree version 134.
+EBAY_US_CATEGORY_NAMES = {
+    "99697": "Washer & Dryer Parts",
+    "116026": "Dishwasher Parts",
+}
 
 STRATA = {
     "dishwasher": "appliance", "refrigerator": "appliance",
@@ -709,10 +716,17 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
         all_items = []
         for result in (pass_a, pass_b, pass_c, pass_d):
             all_items.extend(_diagnostic_items(result))
-        categories = [item.get("category") for item in all_items
+        model_items = [item for result in (pass_d, pass_c)
+                       for item in _diagnostic_items(result)
+                       if item.get("exact_identity")]
+        categories = [item.get("category") for item in model_items
                       if item.get("category")]
         dominant = (max(set(categories), key=categories.count)
                     if categories else "")
+        category_name = EBAY_US_CATEGORY_NAMES.get(dominant, "")
+        source_is_whole_appliance = "Major Appliances" in row["categories"]
+        category_coherent = not (
+            source_is_whole_appliance and category_name.endswith(" Parts"))
         condition_ids = sorted({str(item.get("condition_id"))
                                 for item in all_items
                                 if item.get("condition_id")})
@@ -723,6 +737,8 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
         deterministic_market = any(
             (result or {}).get("usable_market")
             for result in (pass_a, pass_b, pass_c, pass_d))
+        economics_eligible = bool(
+            (pass_d or {}).get("usable_market") and category_coherent)
         if a_count == 0 and c_count == 0:
             classification = "LIKELY_MISSING_EXIT_MARKET"
         elif a_count == 0 and c_count > 0:
@@ -738,7 +754,8 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
             classification = "DETERMINISTIC_MARKET_FOUND"
         output.append({
             "model": row["model"], "manufacturer": row["manufacturers"],
-            "gtin": gtin, "source_conditions": row["conditions"],
+            "gtin": gtin, "source_categories": row["categories"],
+            "source_conditions": row["conditions"],
             "specific_condition": specific, "broad_condition": broad,
             "audited_at": audited_at, "ebay_region": region,
             "gtin_unfiltered_count": a_count,
@@ -754,10 +771,13 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
             "model_unfiltered_status": _diagnostic_status(pass_c),
             "model_condition_status": _diagnostic_status(pass_d),
             "dominant_category_id": dominant,
+            "dominant_category_name": category_name,
+            "category_identity_coherent": int(category_coherent),
             "returned_condition_ids": ";".join(condition_ids),
             "returned_titles_json": json.dumps(titles, separators=(",", ":")),
             "diagnostic_classification": classification,
             "deterministic_market_found": int(deterministic_market),
+            "economics_eligible": int(economics_eligible),
         })
     opener = gzip.open if str(out_path).endswith(".gz") else open
     with opener(out_path, "wt", newline="") as stream:
@@ -778,4 +798,6 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
             int(row["model_condition_count"]) > 0 for row in output),
         "deterministic_markets": sum(
             int(row["deterministic_market_found"]) for row in output),
+        "economics_eligible": sum(
+            int(row["economics_eligible"]) for row in output),
     }
