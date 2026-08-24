@@ -9,6 +9,7 @@ import statistics
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 
@@ -99,10 +100,27 @@ RESOLVER_DIAGNOSTIC_FIELDS = [
     "deterministic_market_found", "economics_eligible",
 ]
 
-# Names verified from eBay US Taxonomy API category tree version 134.
-EBAY_US_CATEGORY_NAMES = {
-    "99697": "Washer & Dryer Parts",
-    "116026": "Dishwasher Parts",
+LIQUIDATION_UNIVERSE_FIELDS = [
+    "model", "manufacturers", "titles", "categories", "upcs",
+    "valid_gtins", "lot_count", "manifest_line_count", "total_quantity",
+    "conditions", "lot_ids", "lot_urls", "first_seen_at",
+]
+
+LIQUIDATION_ECONOMICS_FIELDS = [
+    "model", "manufacturer", "source_categories", "source_conditions",
+    "condition_family", "manifest_lot_count", "manifest_quantity",
+    "market_depth", "active_p25_usd", "allocated_ask_per_unit_usd",
+    "ebay_fee_rate", "return_allowance_rate", "outbound_shipping_usd",
+    "manifest_usable_probability", "expected_net_exit_pre_acquisition_usd",
+    "expected_contribution_at_ask_usd", "expected_contribution_at_ask_gbp",
+    "contribution_margin_at_ask_pct", "required_profit_gbp",
+    "max_all_in_acquisition_per_manifest_unit_usd", "economics_status",
+    "unresolved_lot_costs",
+]
+
+_COMPONENT_CATEGORY_WORDS = {
+    "accessory", "accessories", "part", "parts", "mount", "mounts",
+    "bracket", "brackets", "cable", "cables", "adapter", "adapters",
 }
 
 STRATA = {
@@ -610,6 +628,63 @@ def run_manifest_audit(urls, resolution_path, out_path, timeout=30):
     }
 
 
+def freeze_liquidation_universe(manifest_path, out_path):
+    """Freeze deterministic brand+model identities from a manifest ledger."""
+    rows = _read_csv(manifest_path)
+    groups = defaultdict(list)
+    for row in rows:
+        model = _canonical_text(row.get("line_model"))
+        manufacturer = _canonical_text(row.get("line_manufacturer"))
+        category = row.get("line_category", "")
+        if not model or not manufacturer or not category:
+            continue
+        groups[model].append(row)
+    output = []
+    ambiguous = 0
+    for model_key, members in sorted(groups.items()):
+        manufacturers = sorted({row["line_manufacturer"].strip()
+                                for row in members})
+        canonical_manufacturers = {
+            re.sub(r"(?:labs?|inc|llc|corp|corporation)$", "",
+                   _canonical_text(value)) for value in manufacturers}
+        if len(canonical_manufacturers) != 1:
+            ambiguous += 1
+            continue
+        upcs = sorted({re.sub(r"\D", "", row.get("line_upc", ""))
+                       for row in members if row.get("line_upc")})
+        from identifiers import valid_gtin
+        valid_gtins = [value for value in upcs if valid_gtin(value)]
+        output.append({
+            "model": members[0]["line_model"].strip(),
+            "manufacturers": manufacturers[0],
+            "titles": ";".join(sorted({row["line_title"].strip()
+                                        for row in members})),
+            "categories": ";".join(sorted({row["line_category"].strip()
+                                             for row in members})),
+            "upcs": ";".join(upcs), "valid_gtins": ";".join(valid_gtins),
+            "lot_count": len({row["lot_id"] for row in members}),
+            "manifest_line_count": len(members),
+            "total_quantity": sum(int(row["line_quantity"] or 0)
+                                  for row in members),
+            "conditions": ";".join(sorted({row["line_condition"].strip()
+                                             for row in members})),
+            "lot_ids": ";".join(sorted({row["lot_id"] for row in members})),
+            "lot_urls": ";".join(sorted({row["lot_url"] for row in members})),
+            "first_seen_at": min(row["audited_at"] for row in members),
+        })
+    with open(out_path, "w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=LIQUIDATION_UNIVERSE_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    return {
+        "manifest_lines": len(rows), "identities": len(output),
+        "valid_gtin_identities": sum(bool(row["valid_gtins"])
+                                     for row in output),
+        "ambiguous_models": ambiguous, "checksum": basket_checksum(out_path),
+    }
+
+
 def _liquidation_condition_family(conditions):
     values = {value.strip() for value in conditions.split(";") if value.strip()}
     if "Untested Customer Returns" in values:
@@ -618,7 +693,24 @@ def _liquidation_condition_family(conditions):
         return "used"
     if values & {"Open Box Like New", "Like New"}:
         return "open_box"
+    if values & {"GRADE A", "GRADE B", "GRADE C", "GRADE D"}:
+        return "used"
+    if values & {"New", "BRAND NEW"}:
+        return "new"
     raise ValueError(f"unsupported liquidation conditions {conditions!r}")
+
+
+def category_identity_coherent(source_categories, ebay_category_name):
+    """Reject exact-model hits whose category represents another object."""
+    ebay_words = set(re.findall(r"[a-z]+", ebay_category_name.casefold()))
+    ebay_is_component = bool(ebay_words & _COMPONENT_CATEGORY_WORDS)
+    source_leaves = [value.rsplit("->", 1)[-1].strip().casefold()
+                     for value in source_categories.split(";") if value]
+    source_words = set()
+    for leaf in source_leaves:
+        source_words.update(re.findall(r"[a-z]+", leaf))
+    source_is_component = bool(source_words & _COMPONENT_CATEGORY_WORDS)
+    return not (ebay_is_component and not source_is_component)
 
 
 def run_liquidation_exit_audit(ebay, universe_path, out_path, region="US",
@@ -723,10 +815,9 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
                       if item.get("category")]
         dominant = (max(set(categories), key=categories.count)
                     if categories else "")
-        category_name = EBAY_US_CATEGORY_NAMES.get(dominant, "")
-        source_is_whole_appliance = "Major Appliances" in row["categories"]
-        category_coherent = not (
-            source_is_whole_appliance and category_name.endswith(" Parts"))
+        category_name = ebay.category_name(dominant, region=region)
+        category_coherent = bool(category_name) and category_identity_coherent(
+            row["categories"], category_name)
         condition_ids = sorted({str(item.get("condition_id"))
                                 for item in all_items
                                 if item.get("condition_id")})
@@ -801,3 +892,103 @@ def run_liquidation_resolver_diagnostic(ebay, universe_path, out_path,
         "economics_eligible": sum(
             int(row["economics_eligible"]) for row in output),
     }
+
+
+def run_liquidation_economics(ebay, universe_path, diagnostic_path,
+                              manifest_path, out_path, usd_to_gbp,
+                              fee_rate=0.15, return_rate=0.10,
+                              outbound_shipping=10.0,
+                              manifest_risk=0.15,
+                              required_profit_gbp=15.0, region="US"):
+    """Underwrite only category-coherent exact-condition survivors."""
+    if not 0 < usd_to_gbp or not 0 <= manifest_risk < 1:
+        raise ValueError("invalid FX rate or manifest risk")
+    universe = {_canonical_text(row["model"]): row
+                for row in _read_csv(universe_path)}
+    eligible = [row for row in _read_csv(diagnostic_path)
+                if row.get("economics_eligible") == "1"]
+    manifests = _read_csv(manifest_path)
+    lot_retail = defaultdict(float)
+    for row in manifests:
+        lot_retail[row["lot_id"]] += (
+            float(row["line_retail_price_usd"] or 0) *
+            int(row["line_quantity"] or 0))
+    allocated = defaultdict(float)
+    quantities = defaultdict(int)
+    for row in manifests:
+        key = _canonical_text(row["line_model"])
+        total = lot_retail[row["lot_id"]]
+        quantity = int(row["line_quantity"] or 0)
+        if key not in universe or total <= 0 or quantity <= 0:
+            continue
+        line_retail = float(row["line_retail_price_usd"] or 0) * quantity
+        allocated[key] += float(row["lot_ask_price_usd"] or 0) * line_retail / total
+        quantities[key] += quantity
+    output = []
+    required_profit_usd = required_profit_gbp / usd_to_gbp
+    usable_probability = 1 - manifest_risk
+    for diagnostic in eligible:
+        key = _canonical_text(diagnostic["model"])
+        source = universe[key]
+        condition = _liquidation_condition_family(source["conditions"])
+        result = ebay.lookup_model(
+            source["manufacturers"], source["model"], region=region,
+            limit=10, detail_limit=5, min_market_listings=3,
+            condition=condition) or {}
+        p25 = result.get("p25")
+        quantity = quantities[key]
+        ask_per_unit = allocated[key] / quantity if quantity else 0
+        if p25 is None or not result.get("usable_market"):
+            net_exit = contribution = max_acquisition = None
+            status = "REJECT_MARKET_CHANGED"
+        else:
+            p25 = float(p25)
+            net_exit = usable_probability * (
+                p25 * (1 - fee_rate - return_rate) - outbound_shipping)
+            contribution = net_exit - ask_per_unit
+            max_acquisition = max(0.0, net_exit - required_profit_usd)
+            margin = contribution / p25 * 100 if p25 else 0
+            status = ("VIABLE_AT_ALLOCATED_ASK" if
+                      contribution * usd_to_gbp >= required_profit_gbp and
+                      margin >= 20 else "REJECT_CONTRIBUTION_GATE")
+        output.append({
+            "model": source["model"],
+            "manufacturer": source["manufacturers"],
+            "source_categories": source["categories"],
+            "source_conditions": source["conditions"],
+            "condition_family": condition,
+            "manifest_lot_count": source["lot_count"],
+            "manifest_quantity": quantity,
+            "market_depth": result.get("coherent_depth", 0),
+            "active_p25_usd": f"{p25:.2f}" if p25 is not None else "",
+            "allocated_ask_per_unit_usd": f"{ask_per_unit:.2f}",
+            "ebay_fee_rate": f"{fee_rate:.4f}",
+            "return_allowance_rate": f"{return_rate:.4f}",
+            "outbound_shipping_usd": f"{outbound_shipping:.2f}",
+            "manifest_usable_probability": f"{usable_probability:.4f}",
+            "expected_net_exit_pre_acquisition_usd": (
+                f"{net_exit:.2f}" if net_exit is not None else ""),
+            "expected_contribution_at_ask_usd": (
+                f"{contribution:.2f}" if contribution is not None else ""),
+            "expected_contribution_at_ask_gbp": (
+                f"{contribution * usd_to_gbp:.2f}"
+                if contribution is not None else ""),
+            "contribution_margin_at_ask_pct": (
+                f"{contribution / p25 * 100:.2f}"
+                if contribution is not None and p25 else ""),
+            "required_profit_gbp": f"{required_profit_gbp:.2f}",
+            "max_all_in_acquisition_per_manifest_unit_usd": (
+                f"{max_acquisition:.2f}" if max_acquisition is not None else ""),
+            "economics_status": status,
+            "unresolved_lot_costs": "buyer_premium;inbound_freight;sales_tax",
+        })
+    with open(out_path, "w", newline="") as stream:
+        writer = csv.DictWriter(stream,
+                                fieldnames=LIQUIDATION_ECONOMICS_FIELDS,
+                                lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(output)
+    viable = sum(row["economics_status"] == "VIABLE_AT_ALLOCATED_ASK"
+                 for row in output)
+    return {"rows": len(output), "viable": viable,
+            "advance": viable >= 3}

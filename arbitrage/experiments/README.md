@@ -111,6 +111,11 @@ condition, UPC, quantity, and price fields. The completed 10-lot result is in
 deterministic non-frozen identities retained separately in
 `mpn-manifest-unmatched-identities.csv`.
 
+The subsequent small, shippable security-goods test is documented in
+`SMALL-GOODS-LIQUIDATION-GATE.md`. Its exact-model/category resolver passed,
+but all four eligible Wyze identities failed conservative economics at the
+current Direct Liquidation ask.
+
 Resolve the frozen 80 valid-GTIN liquidation identities against eBay US using
 their conservative source-condition families:
 

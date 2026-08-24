@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 BROWSE_ITEMS = "https://api.ebay.com/buy/browse/v1/item/"
+TAXONOMY = "https://api.ebay.com/commerce/taxonomy/v1"
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 
 # eBay marketplace ids by the region codes used in stores.txt
@@ -189,6 +190,34 @@ class EbayComp:
         return self._lookup_brand_identifier(
             brand, model, "model", region, limit, detail_limit,
             min_market_listings, condition)
+
+    def category_name(self, category_id, region="US"):
+        """Return the current structured eBay leaf-category name."""
+        mkt = marketplace_id(region)
+        category_id = str(category_id or "").strip()
+        if not category_id:
+            return ""
+        key = hashlib.sha1(
+            f"taxonomy-v1|{mkt}|{category_id}".encode()).hexdigest()
+        row = self.conn.execute(
+            "SELECT ts,payload FROM comps WHERE key=?", (key,)).fetchone()
+        if row and time.time() - row[0] < COMP_TTL:
+            self.cache_hits += 1
+            return json.loads(row[1]).get("category_name", "")
+        tree_id = "0" if mkt == "EBAY_US" else None
+        if tree_id is None:
+            return ""
+        url = (f"{TAXONOMY}/category_tree/{tree_id}/get_category_subtree?" +
+               urllib.parse.urlencode({"category_id": category_id}))
+        data = self._browse_json(url, mkt)
+        node = (data or {}).get("categorySubtreeNode", {})
+        name = str((node.get("category") or {}).get("categoryName") or "")
+        if name:
+            payload = json.dumps({"category_name": name})
+            self.conn.execute("INSERT OR REPLACE INTO comps VALUES (?,?,?)",
+                              (key, time.time(), payload))
+            self.conn.commit()
+        return name
 
     def _lookup_brand_identifier(self, brand, identifier, identity_kind,
                                  region, limit, detail_limit,

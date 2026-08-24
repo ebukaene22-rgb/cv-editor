@@ -234,11 +234,44 @@ class IdentifierTests(unittest.TestCase):
         self.assertEqual(result["exact_model_items"], 1)
         self.assertTrue(result["usable_market"])
 
-    def test_known_ebay_parts_categories_are_structured_evidence(self):
-        self.assertEqual(MPN.EBAY_US_CATEGORY_NAMES["99697"],
-                         "Washer & Dryer Parts")
-        self.assertEqual(MPN.EBAY_US_CATEGORY_NAMES["116026"],
-                         "Dishwasher Parts")
+    def test_category_coherence_rejects_different_economic_object(self):
+        self.assertFalse(MPN.category_identity_coherent(
+            "Home -> Appliances -> Major Appliances -> Laundry",
+            "Washer & Dryer Parts"))
+        self.assertTrue(MPN.category_identity_coherent(
+            "Electronics -> Cameras -> Accessories",
+            "Camera Parts & Accessories"))
+        self.assertTrue(MPN.category_identity_coherent(
+            "Electronics -> Security & Surveillance",
+            "Surveillance Cameras"))
+
+    def test_liquidation_freeze_aggregates_model_before_resolution(self):
+        fields = MPN.MANIFEST_FIELDS
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = os.path.join(tmp, "manifest.csv")
+            universe = os.path.join(tmp, "universe.csv")
+            base = {field: "" for field in fields}
+            with open(manifest, "w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=fields)
+                writer.writeheader()
+                for lot_id, quantity in (("1", "2"), ("2", "3")):
+                    writer.writerow({
+                        **base, "lot_id": lot_id,
+                        "lot_url": f"https://example.test/{lot_id}",
+                        "line_manufacturer": "Wyze", "line_model": "CAM1",
+                        "line_title": "Wyze camera",
+                        "line_category": "Electronics -> Security Cameras",
+                        "line_condition": "GRADE A",
+                        "line_upc": "810083470917",
+                        "line_quantity": quantity,
+                        "audited_at": "2026-08-24T00:00:00Z",
+                    })
+            result = MPN.freeze_liquidation_universe(manifest, universe)
+            with open(universe, newline="") as stream:
+                rows = list(csv.DictReader(stream))
+        self.assertEqual(result["identities"], 1)
+        self.assertEqual(rows[0]["lot_count"], "2")
+        self.assertEqual(rows[0]["total_quantity"], "5")
 
     def test_source_brand_matching_uses_only_approved_families(self):
         self.assertEqual(MPN.source_brand_match("Frigidaire", "Electrolux"),

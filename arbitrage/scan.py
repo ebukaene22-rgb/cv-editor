@@ -561,6 +561,18 @@ def cmd_mpn_manifest_audit(args):
     print(f"evidence -> {args.out}")
 
 
+def cmd_liquidation_freeze(args):
+    """Freeze deterministic source identities before exit-market queries."""
+    import mpn as M
+    totals = M.freeze_liquidation_universe(args.manifest, args.out)
+    print(f"frozen liquidation universe: {totals['identities']} identities from "
+          f"{totals['manifest_lines']} manifest lines")
+    print(f"valid-GTIN identities: {totals['valid_gtin_identities']}; ambiguous "
+          f"models excluded: {totals['ambiguous_models']}")
+    print(f"sha256: {totals['checksum']}")
+    print(f"frozen evidence -> {args.out}")
+
+
 def cmd_liquidation_exit_audit(args):
     """Resolve the frozen liquidation-first GTIN universe on eBay."""
     import comp as C
@@ -598,6 +610,30 @@ def cmd_liquidation_resolver_diagnostic(args):
     print(f"deterministic markets: {totals['deterministic_markets']}")
     print(f"category-coherent exact-condition markets eligible for economics: "
           f"{totals['economics_eligible']}")
+    print(f"evidence -> {args.out}")
+
+
+def cmd_liquidation_economics(args):
+    """Underwrite category-coherent small-goods resolver survivors."""
+    import comp as C
+    import mpn as M
+    conn = db()
+    ebay = C.EbayComp(conn)
+    if ebay.synthetic:
+        sys.exit("liquidation-economics requires eBay credentials")
+    rate = args.usd_to_gbp or fx_rates(conn).get("GBP")
+    if not rate:
+        sys.exit("USD-to-GBP rate unavailable; pass --usd-to-gbp")
+    totals = M.run_liquidation_economics(
+        ebay, args.universe, args.diagnostic, args.manifest, args.out, rate,
+        fee_rate=args.fee_rate, return_rate=args.return_rate,
+        outbound_shipping=args.outbound_shipping,
+        manifest_risk=args.manifest_risk,
+        required_profit_gbp=args.required_profit_gbp,
+        region=args.ebay_region)
+    verdict = "ADVANCE_LIQUIDATION" if totals["advance"] else "KILL_ECONOMICS"
+    print(f"liquidation economics: {totals['viable']}/{totals['rows']} viable; "
+          f"verdict: {verdict}")
     print(f"evidence -> {args.out}")
 
 
@@ -879,6 +915,10 @@ def main():
     mm.add_argument("--out", default="experiments/mpn-manifest-ledger.csv")
     mm.add_argument("--timeout", type=int, default=30)
     mm.set_defaults(fn=cmd_mpn_manifest_audit)
+    lf = sub.add_parser("liquidation-freeze")
+    lf.add_argument("--manifest", required=True)
+    lf.add_argument("--out", required=True)
+    lf.set_defaults(fn=cmd_liquidation_freeze)
     le = sub.add_parser("liquidation-exit-audit")
     le.add_argument("--universe",
                     default="experiments/mpn-manifest-unmatched-identities.csv")
@@ -895,6 +935,19 @@ def main():
     ld.add_argument("--ebay-region", default="US")
     ld.add_argument("--min-market-listings", type=int, default=3)
     ld.set_defaults(fn=cmd_liquidation_resolver_diagnostic)
+    lg = sub.add_parser("liquidation-economics")
+    lg.add_argument("--universe", required=True)
+    lg.add_argument("--diagnostic", required=True)
+    lg.add_argument("--manifest", required=True)
+    lg.add_argument("--out", required=True)
+    lg.add_argument("--ebay-region", default="US")
+    lg.add_argument("--usd-to-gbp", type=float)
+    lg.add_argument("--fee-rate", type=float, default=0.15)
+    lg.add_argument("--return-rate", type=float, default=0.10)
+    lg.add_argument("--outbound-shipping", type=float, default=10.0)
+    lg.add_argument("--manifest-risk", type=float, default=0.15)
+    lg.add_argument("--required-profit-gbp", type=float, default=15.0)
+    lg.set_defaults(fn=cmd_liquidation_economics)
     ob = sub.add_parser("openbox-cohort")
     ob.add_argument("-n", type=int, default=30)
     ob.add_argument("--out", default="experiments/openbox-cohort.csv")
