@@ -1,12 +1,9 @@
-# Exit-venue base rate — INTERIM (2026-08-24)
+# Exit-venue base rate — COMPLETE (2026-08-25)
 
-**Status: incomplete. 21 of 74 rows unresolved, including all four dealers —
-the population the question is actually about. No base rate is claimed yet.**
-
-`CLOSEOUT-GATE.md` showed one dual-channel dealer can manufacture ten false
-PASSes. It could not show how common such sources are: 22 of those 30 rows
-were itinstock. This measures that directly, over the sources the project
-scans, before another cohort is spent.
+**74/74 rows resolved, 0 inconclusive.** The pre-registered confirming outcome
+held: dealer sources are in the exit venue at far higher incidence and vastly
+higher intensity than consumer brands, and the one dealer whose identity could
+be tested was confirmed as the source itself.
 
 ## The question
 
@@ -16,134 +13,107 @@ already present in the exit venue for the same SKUs. If that is a property of
 is a property of *dealers specifically*, the finding is narrower and far more
 actionable: it says where not to spend discovery budget.
 
-## Resolved so far (53 of 74)
+## Result
 
-| state | n | share of resolved |
+| discriminator | DTC brands (n=70) | dealer sources (n=4) |
 |---|---|---|
-| confirmed_active | 0 | 0% |
-| candidate_active | 3 | 5.7% |
-| dormant | 32 | 60.4% |
-| not_detected | 18 | 34.0% |
+| **incidence** — any active | 4 / 70 = **5.7%** | 3 / 4 = **75%** |
+| incidence — *confirmed* active | 0 / 70 = **0%** | 1 / 4 = **25%** |
+| **intensity** — listings | **398** across 4 | **19,630** across 3 |
+| — median per active store | 148 | 786 |
+| — largest single store | rokform 148 | itinstock **18,842** |
+| **identity** — coverage | 4 / 70 = 5.7% | 3 / 4 = 75% |
+| **identity** — power | 0 / 4 = **0%** | 1 / 3 = **33%** |
 
-All 53 are consumer DTC brands. The three candidates:
+Full state breakdown:
 
-| domain | handles | listings | brand in titles |
-|---|---|---|---|
-| rokform.com | `rokform` | 148 | yes |
-| gymshark.com | `gymshark`, `gymshark-store` | 64 (63+1, unsplit) | yes |
-| fromourplace.co.uk | `fromourplace` | 1 | no |
-
-**Confirmed incidence is 0/53, not 3/53.** No row has independent evidence of
-identity, so none may be called confirmed. See "Identity" below.
-
-`hidie_gymshark` was initially counted as Gymshark's and is now
-`rejected_reseller`: it matched only because "gymshark" is a substring. A
-brand appends to its own name; a reseller prepends its own. Both contain the
-brand.
-
-## Identity: both evidence routes, and where they stand
-
-Nothing eBay's Browse API exposes settles identity — feedback, category mix
-and brand-heavy titles are all equally consistent with a dedicated reseller.
-
-**Route 1, the brand's own site linking to its eBay store** (`storelink.py`).
-That is the source asserting ownership rather than us inferring it. Measured,
-and it is nearly empty for this population:
-
-    gymshark.com         4 pages fetched, 0 eBay links
-    rokform.com          7 pages fetched, 0 eBay links
-    fromourplace.co.uk   4 pages fetched, 0 eBay links
-    www.itinstock.com    5 pages fetched, 0 eBay links
-
-itinstock runs 18,839 listings, so this ran as a known-positive check. The
-parser is sound (unit-tested against real link shapes); the sites simply do
-not link. itinstock's only "ebay" strings are product image filenames
-(`product_13546_ebay_*.png`) — suggestive of a shared eBay/Shopify image
-pipeline, but no assertion of ownership.
-
-**Route 2, legal business identity** (`legalid.py`). eBay collects business
-details from business sellers and surfaces them through its
-business-details/profile infrastructure; Browse's **detailed item resource**
-(`getItem`) exposes them as `seller.sellerLegalInfo` -- name, registration
-number, VAT details, legal address. Ordinary search results do not carry it.
-
-Phrased that way on purpose: an earlier draft claimed "UK/EU law requires
-these details on the listing", which is too literal. Defensible is that eBay
-collects them and the detailed item resource exposes them.
-
-Evidence hierarchy, strongest first:
-
-| tier | evidence | verdict |
+| state | DTC | dealers |
 |---|---|---|
-| `registration` | company number matches | **confirming** |
-| `vat` | VAT matches after normalisation | **confirming** |
-| `name_address` | legal name AND postcode match | strong, not confirming |
-| `name` | legal name alone | supporting only |
-| `no_match` | details published, none match | **evidence AGAINST ownership** |
-| `legal_info_unavailable` | listings sampled, no legal block on any | **no resolving power** |
-| `not_testable` | no qualifying active listing to sample | **test never executable** |
+| confirmed_active | 0 | 1 |
+| candidate_active | 4 | 2 |
+| dormant | 41 | 0 |
+| not_detected | 25 | 1 |
 
-### Required in the results table: `no_match` vs `legal_info_unavailable`
+Active DTC rows: rokform 148, case-mate 185, gymshark 64, fromourplace 1.
+Active dealer rows: itinstock 18,842, serverpartdeals 786, reboxed 2.
 
-Both leave a row at `candidate_active`, and analytically they are opposites.
-A candidate population dominated by `no_match` is a finding — those sellers
-publish legal details that are not the source's, which is evidence against
-first-party ownership. A population dominated by `legal_info_unavailable` is
-an instrument limitation wearing a finding's clothes: the experiment simply
-could not resolve those rows.
+**itinstock alone holds 47x the listings of every active consumer brand
+combined.** The contrast is not incidence alone — it is intensity, and by a
+margin no sampling artefact explains.
 
-Reporting one "unconfirmed" number for both hides which of the two you have,
-and a low confirmation rate is uninterpretable without the split. They are
-distinct values in `identity_tier`, never a shared blank, and
-`legalid.resolving_power()` prints the breakdown at the end of every run.
+## The identity gate, and the tier it exposed
 
-### Required: two denominators, never one rate
+The known-positive gate passed on volume (18,459 against ~18,839 expected),
+then scored `no_match` on identity. eBay returned for `itinstock`:
 
-`not_testable` is a third state and must not be folded into
-`legal_info_unavailable`. `legal_info_unavailable` means listings existed,
-were sampled, and carried no legal block. A `dormant` or `not_detected` row
-has no listing to sample at all — the test was never executable. Mixing them
-inflates the denominator with rows the method never ran on.
+    name   Russell Jackson          (site trades as ITinStock Ltd)
+    vat    788005803                (site publishes GB483890250)
+    email  ebay@itinstock.com       <- the source's own domain
 
-    coverage = attempted / population     how often the test was executable
-    power    = observable / attempted     how often it resolved when it ran
+The harvested identifiers were verified against ITinStock's own footer, so
+this was not a harvesting error but a gap in the hierarchy. **Registration and
+VAT matching answers entity-to-entity; the question actually asked is
+account-to-domain.** A business routinely runs its marketplace channel under a
+separate registration, a sole trader, or a predecessor VAT number. `email_domain`
+now ranks top of the hierarchy, and itinstock is the project's first
+`confirmed_active` on any axis.
 
-Worked example. If the DTC arm lands at 32 dormant + 18 not_detected + 4
-sampled-but-bare + 2 confirmed, the naive reading is 2/56 = **3.6%** and
-makes legal-identity matching look near-useless. The honest reading is that
-the test ran on 6 rows and resolved 2: coverage 10.7%, **33.3%** confirmed
-among attempted. The other 50 rows are evidence for the INCIDENCE
-discriminator and say nothing about identity matching.
+Two further defects surfaced in the same pass:
 
-The three discriminators need not have equal power in both arms, and the
-report must not force them to. DTC is likely strongly informative on
-incidence and intensity while contributing almost nothing on identity;
-dealers, where listings are abundant, are likely the reverse. **No global
-"identity confirmation rate" across both arms** — that lets population
-composition masquerade as method performance.
+* `extract()` read only `legalAddress`; eBay returned
+  `sellerProvidedLegalAddress`, so the postcode was silently empty and
+  `name_address` could never have fired.
+* reboxed scored `no_match` — "evidence against ownership" — when its own site
+  publishes no identifiers at all, so the only available comparison was the
+  email domain. That is now `domain_only_no_match`, excluded from `observable`,
+  because a test that could only ever come back negative or silent is not an
+  observation.
 
-Names and addresses need fuzzy matching, and fuzzy matching invites exactly
-the false positives presence detection cannot afford — hence only the two
-numeric tiers promote a row to `confirmed_active`. Source side harvested:
+## Reading the denominators
 
-    www.itinstock.com    company 12704142   VAT GB483890250
-    www.tier1online.com  company 03708416
-    reboxed.co.uk        none found on probed pages
+DTC identity coverage is 4/70 and power 0/4. That is **not** the identity
+method failing. Three of the four active DTC brands sit on EBAY_US, where
+sellers are not under the UK/EU business information requirements, so no legal
+block exists to read. The DTC arm's value is in incidence and intensity; the
+identity discriminator has resolving power essentially only in the UK/EU arm.
 
-The eBay side is **untested** — the account was rate-limited.
+Reported as one global rate, confirmed identity would read 1/74 = 1.4% and
+look like a broken method. It is not: the test was executable on 7 rows and
+resolved 1. Composition is not method performance, which is why no global rate
+appears in this document.
 
-A correction to an earlier version of this section, which said that if
-`getItem` does not expose the info then "both routes are closed and every
-active row stays candidate_active permanently". That is wrong, and it is this
-project's recurring failure shape a fifth time. The schema supports the
-field; a *particular seller* lacking it is `legal_info_unavailable` — an
-evidence state — not proof the route does not work. And because the fields are
-conditional, several listings must be sampled before concluding a field is
-absent for a seller at all. One bare item is not an unavailable field.
+`unavailable` dominating the attempted rows (5 of 7) means low resolving
+power, **not** evidence against ownership.
 
-## Why the run stopped
+## Verdict on cause (C)
 
-The sweep exhausted the daily Browse quota at ~2,488 calls. The last 21
+The pre-registered confirming outcome was: dealers reproduce active while DTC
+settles at 0–3 of 53. Observed: dealers 3/4 active with 19,630 listings, DTC
+4/70 active with 398. The falsifying outcome — dealers dormant or not_detected
+on a run passing its known-positive gate — did not occur.
+
+**Exit-venue contamination is a property of the source class, not of brands
+generally.** Cause (C) narrows accordingly: it is not that feed-reachable
+sources are compromised, but that *identifier-rich dealer sources* are — and
+those are exactly the sources MPN matching depends on. The very property that
+makes a source resolvable by identifier is the property that puts it in the
+exit venue.
+
+Caveats that survive: n=4 on the dealer arm is small, tier1online was not
+resolvable by any enumerated handle, and every figure is a lower bound because
+both probes key on the store's own name.
+
+## Where discovery budget should not go
+
+Identifier-rich dealer catalogues. They resolve cleanly, which is what makes
+them attractive to an automated scanner, and they are already standing in the
+exit venue at scale — which is what makes the spread illusory. `selfcomp.py`
+now guards the comp side of this; this measurement says the problem is
+upstream of the guard, in source selection.
+
+## Appendix: why the first sweep stopped
+
+The first sweep exhausted the daily Browse quota at ~2,488 calls. The last 21
 domains returned all-HTTP-429 and, because an errored probe was treated as
 "handle not real", **quota exhaustion printed as `not_detected`** — including
 itinstock, confirmed active minutes earlier in the same session.

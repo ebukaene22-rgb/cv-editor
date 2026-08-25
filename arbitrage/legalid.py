@@ -178,7 +178,23 @@ UNAVAILABLE = "legal_info_unavailable"
 # level up.
 NOT_TESTABLE = "not_testable"
 
-NON_EVIDENCE = (NO_MATCH, UNAVAILABLE, NOT_TESTABLE)
+#   domain_only_no_match  legal details were published, but the source
+#                         publishes NO identifiers of its own -- so the only
+#                         comparison available was the contact email domain,
+#                         and it did not match.
+#
+# reboxed.co.uk earned this one. Its site publishes no company or VAT number,
+# so `expected` carried nothing but a domain; the email simply was not at that
+# domain. Scoring that plain `no_match` asserts "evidence against first-party
+# ownership" on the strength of one weak test that could only ever have come
+# back negative or silent. A VAT mismatch is a real contradiction; a
+# non-matching email, with nothing else to check, is closer to no information.
+DOMAIN_ONLY_NO_MATCH = "domain_only_no_match"
+
+NON_EVIDENCE = (NO_MATCH, DOMAIN_ONLY_NO_MATCH, UNAVAILABLE, NOT_TESTABLE)
+
+# Identifiers that make a mismatch meaningful.
+STRONG_EXPECTED = ("registrationNumber", "vat", "name")
 
 # Tiers on which legal identity was actually OBSERVABLE. no_match belongs
 # here: contradicting evidence is still evidence the mechanism worked.
@@ -282,6 +298,11 @@ def evaluate(observed, expected):
     if nm:
         return "name", (f"legal name '{observed['name']}' matches, address "
                         f"unconfirmed -- supporting evidence only")
+    if not any((expected or {}).get(k) for k in STRONG_EXPECTED):
+        return DOMAIN_ONLY_NO_MATCH, (
+            "legal info published, but the source publishes no identifiers to "
+            "compare -- only the email domain was testable and it did not "
+            "match; weak evidence, not a contradiction")
     return NO_MATCH, ("legal info published but nothing matches the source "
                       "-- evidence against first-party ownership")
 
@@ -309,6 +330,11 @@ def best_of(observations, expected):
         return UNAVAILABLE, (f"no legal block on any of {n} sampled listings "
                              f"-- no resolving power here, NOT evidence "
                              f"against ownership")
+    if not any((expected or {}).get(k) for k in STRONG_EXPECTED):
+        return DOMAIN_ONLY_NO_MATCH, (
+            f"legal info published across {n} sampled listings, but the "
+            f"source publishes no identifiers to compare -- only the email "
+            f"domain was testable")
     return NO_MATCH, (f"legal info published across {n} sampled listings, "
                       f"none matching the source")
 
@@ -342,7 +368,7 @@ def resolving_power(tiers):
     """
     out = dict.fromkeys(
         ("confirmed", "corroborated", "supporting", "no_match",
-         "unavailable", "not_testable"), 0)
+         "domain_only_no_match", "unavailable", "not_testable"), 0)
     for t in tiers:
         if t in CONFIRMING:
             out["confirmed"] += 1
@@ -352,14 +378,18 @@ def resolving_power(tiers):
             out["supporting"] += 1
         elif t == NO_MATCH:
             out["no_match"] += 1
+        elif t == DOMAIN_ONLY_NO_MATCH:
+            out["domain_only_no_match"] += 1
         elif t == UNAVAILABLE:
             out["unavailable"] += 1
         else:
             out["not_testable"] += 1
     out["population"] = sum(out[k] for k in (
         "confirmed", "corroborated", "supporting", "no_match",
-        "unavailable", "not_testable"))
+        "domain_only_no_match", "unavailable", "not_testable"))
     out["attempted"] = out["population"] - out["not_testable"]
+    # domain_only_no_match is deliberately NOT observable: the only test
+    # available could not have produced positive evidence either way.
     out["observable"] = (out["confirmed"] + out["corroborated"]
                          + out["supporting"] + out["no_match"])
     out["coverage"] = (out["attempted"] / out["population"]

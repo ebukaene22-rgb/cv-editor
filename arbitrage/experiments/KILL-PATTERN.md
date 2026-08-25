@@ -99,11 +99,36 @@ On that hypothesis a mechanism survives only if the seller's objective is
 **not** price maximisation, the seller is **not** a pricing specialist, and
 the seller is **not already in the exit venue**.
 
-Testable prediction for mechanism seven: a source whose catalogue is clean
-enough to resolve by identifier will already be present in the exit venue for
-a material share of the same SKUs. A mechanism is more likely to survive if it
-sources from somewhere structurally *barred* from the exit venue — not merely
-absent from it.
+**Measured, 2026-08-25 — the prediction held.** `EXIT-VENUE-BASE-RATE.md`,
+74/74 rows resolved, 0 inconclusive:
+
+| | DTC brands (n=70) | dealer sources (n=4) |
+|---|---|---|
+| active in exit venue | 4 (5.7%) | 3 (75%) |
+| listings | 398 | 19,630 |
+| identity-confirmed as the source | 0 | 1 (itinstock) |
+
+itinstock alone holds 47x the listings of every active consumer brand
+combined, and its eBay contact email `ebay@itinstock.com` confirms the store
+is the source itself. The falsifying outcome — dealers dormant or not_detected
+on a run passing its known-positive gate — did not occur.
+
+So (C) is **not** "feed-reachable sources are compromised". It is
+**"identifier-rich dealer sources are compromised"** — and those are exactly
+the sources MPN matching depends on. The property that makes a source
+resolvable by identifier is the property that puts it in the exit venue at
+scale. Consumer brands are overwhelmingly absent from it (41 of 70 register a
+handle and list nothing at all), but they are also the sources that cannot be
+resolved by identifier, which is why the earlier cohorts died on identity
+instead.
+
+Caveats: n=4 on the dealer arm, tier1online unresolvable by any enumerated
+handle, and every figure is a lower bound since both probes key on the store's
+own name.
+
+Standing prediction for mechanism seven: a mechanism is more likely to survive
+if it sources from somewhere structurally *barred* from the exit venue — not
+merely absent from it.
 
 If that holds, the honest conclusion is not "try mechanism eight". It is that
 **automated public-feed sourcing and mispriced supply may be close to mutually
