@@ -1,0 +1,29 @@
+{
+  "fx": { "jpy_per_usd": 147.0 },
+  "source_costs_jpy": {
+    "proxy_fee_per_item": 500,
+    "proxy_card_pct": 0.03,
+    "jp_domestic_ship": 1200,
+    "consolidation_per_item": 300,
+    "intl_ship_by_weight": { "small": 2800, "medium": 4500, "large": 6500 }
+  },
+  "route": {
+    "mode": "direct",
+    "dubai_import_pct": 0.1025,
+    "dubai_clearance_fee_usd": 15.0
+  },
+  "sell_costs": {
+    "ebay_fvf_pct": { "default": 0.136, "cameras_photo_store": 0.0935, "watches": 0.15 },
+    "ebay_per_order_usd": 0.40,
+    "ebay_intl_surcharge_pct": 0.0165,
+    "payoneer_fx_pct": 0.02,
+    "outbound_ship_usd": { "small": 18.0, "medium": 28.0, "large": 45.0 },
+    "return_defect_reserve_pct": 0.05
+  },
+  "underwriting": {
+    "target_roi_on_cost": 0.35,
+    "scale_gate_realized_roi": 0.20,
+    "max_cycle_days": 45,
+    "required_capacity_multiple": 2.0
+  }
+}

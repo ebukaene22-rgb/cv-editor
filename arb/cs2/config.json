@@ -1,0 +1,15 @@
+{
+  "api_base": "https://csfloat.com/api/v1",
+  "api_key_env": "CSFLOAT_API_KEY",
+  "poll_interval_s": 30,
+  "recheck_horizons_s": [5, 15, 60, 300, 1800],
+  "min_requests_gap_s": 1.5,
+  "families": [
+    "AWP | Asiimov (Field-Tested)",
+    "AK-47 | Redline (Field-Tested)",
+    "Glock-18 | Fade (Factory New)"
+  ],
+  "reference_window": 40,
+  "fees": { "sell_pct": 0.02, "withdrawal_pct": 0.01 },
+  "gate": { "min_candidates": 100, "min_median_net_edge_on_survivors": 0.07, "survival_horizon_s": 300 }
+}
