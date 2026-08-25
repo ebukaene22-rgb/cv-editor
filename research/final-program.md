@@ -110,3 +110,28 @@ executed loop: deposit → buy → sell → payout landed in the actual UAE acco
 Principle adopted verbatim from the review: capital accelerates a proven strategy;
 it must not compensate for an unproven one. First KPI for both lanes:
 completed net profit (including losers, returns, dead stock) ÷ capital-days deployed.
+
+## Addendum (verified from third external review, Aug 2026)
+
+The third review pass contributed two UAE-specific facts worth keeping; both were
+verified and both reinforce the ship-direct-from-Japan architecture:
+
+- **De minimis corrected:** Dubai lowered its duty-free threshold to **AED 300
+  (~$82)** per shipment in Jan 2023 (Abu Dhabi: AED 1,000). The review's "~AED
+  1,000" figure is wrong for Dubai. Practically: almost every pilot item routed
+  through Dubai will incur the ~10.25% duty+VAT stack — one more reason inventory
+  should not transit the UAE.
+- **Parallel-import risk is real for UAE-bound goods:** under Federal Law No. 3 of
+  2022, a registered exclusive agent's rights are enforceable against third
+  parties, and customs can seize unauthorised imports of agency-registered brands
+  at the agent's request. Risk applies to imports INTO the UAE of actively
+  distributed brands (note: Seiko has UAE distribution). Used/vintage goods
+  enforcement is rarer but nonzero. Ship-direct-from-Japan avoids the exposure
+  entirely; any Dubai-routed test should avoid agency-registered current brands.
+
+Everything else in that review was rejected: it re-inflated the CS2 allocation to
+$5k live buys without the recorder gate, resurrected domain flipping without new
+evidence against the prior kill, contradicted itself on CS2 net margins (10–15%
+target vs its own 5–10% verification) and turn rate, and proposed selling
+hand-registered domains at 2x within 5 weeks — a lottery dressed as a KPI. The
+program stands as written above.
