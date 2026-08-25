@@ -135,3 +135,37 @@ evidence against the prior kill, contradicted itself on CS2 net margins (10–15
 target vs its own 5–10% verification) and turn rate, and proposed selling
 hand-registered domains at 2x within 5 weeks — a lottery dressed as a KPI. The
 program stands as written above.
+
+## Addendum 2 (fourth external review, Aug 2026) — and review-loop closure
+
+**Adopted — the one new operational fact, verified:** eBay payouts for UAE sellers
+run exclusively through **Payoneer, in USD** (no PayPal), verification requires
+Emirates ID, and listing at commercial volume requires a **UAE trade license**;
+new unverified accounts start with low selling limits. This adds a Phase 0 gate
+to the Japan pilot, ahead of any sourcing work:
+
+  0a. Open eBay seller account + Payoneer, complete ID verification.
+  0b. Establish the license path (Dubai E-Trader-class licenses exist for
+      individuals at far below full trade-license cost — price this against the
+      $500/mo target before committing).
+  0c. Confirm actual selling limits on the fresh account; if limits cap the pilot
+      below ~8 items/month, resolve before buying inventory.
+  0d. Model the USD→AED conversion cost (~1–2%) into the fee stack.
+
+**Noted, no change:** the review's CS2 realised-net estimate (3–6%) now matches
+review #2 and this program's underwriting — three independent passes converge.
+Its own allocation ($4–5k to CS2) contradicts its own arithmetic ($3k at 6% × 2
+turns = $360/mo) and is rejected; the recorder gate already resolves the
+kill-vs-slim-proceed disagreement empirically. Its suggestion to consider
+"unregulated crypto prediction markets" is rejected outright — UAE GCGRA law
+makes that a legal exposure, not a workaround.
+
+**Review loop closed.** Across four external passes plus internal research, every
+falsifiable disagreement has converged: CS2 realised net 3–6% until proven
+otherwise; Japan margins unproven and gated on a prospective log; payment rails
+tested before capital in both lanes; prediction/DFS lanes dead. The two
+remaining open items are not researchable: (1) the podcast lane is a preference
+question (willingness to do direct sales — two of four reviewers favor it if
+yes); (2) everything else is empirical and answered only by the two $0-capital
+instruments: the Japan opportunity log and the CS2 opportunity-duration recorder.
+Further prose reviews are expected to add noise, not signal.
