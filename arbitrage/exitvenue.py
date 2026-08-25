@@ -368,7 +368,11 @@ def probe_domain(api, domain, region, verbose=True, confirm=True):
             # Route two first: a registration/VAT match is the strongest
             # automated attribution, and route one measured nearly empty.
             expected = SOURCE_LEGAL.get(domain)
-            if expected and item_ids:
+            if expected is None:
+                # domain alone still enables the email_domain tier
+                expected = {}
+            expected = dict(expected, domain=domain)
+            if item_ids:
                 obs = sample_legal(api, real[0], mkt, item_ids)
                 tier, why = legalid.best_of(obs, expected)
                 if legalid.is_confirming(tier):

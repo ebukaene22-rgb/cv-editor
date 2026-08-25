@@ -123,15 +123,38 @@ def norm_postcode(s):
 # --- evidence -------------------------------------------------------------
 
 # Positive evidence, strongest first. Only these participate in ranking.
-TIERS = ("registration", "vat", "name_address", "name")
-CONFIRMING = ("registration", "vat")
+#
+# `email_domain` ranks top, and the itinstock gate is why. eBay returned:
+#
+#     name   Russell Jackson          (site trades as ITinStock Ltd)
+#     vat    788005803                (site publishes GB483890250)
+#     email  ebay@itinstock.com       <- the source's own domain
+#
+# A registration/VAT-only test scored that `no_match` -- "evidence against
+# first-party ownership" -- which is flatly wrong: an email at the source's
+# domain ties the eBay ACCOUNT to the DOMAIN, which is the question actually
+# being asked. Company-number matching answers a different one, entity to
+# entity, and a business routinely runs its marketplace channel under a
+# separate registration, a sole trader, or a predecessor VAT number.
+#
+# Caveat carried honestly: sellerLegalInfo is seller-PROVIDED. A reseller
+# could in principle enter an address at someone else's domain. It is treated
+# as confirming because doing so is a false statement to eBay under business
+# seller requirements, not merely a naming choice -- unlike a handle, which
+# anyone can register.
+TIERS = ("email_domain", "registration", "vat", "name_address", "name")
+CONFIRMING = ("email_domain", "registration", "vat")
 
 # Two NON-evidence outcomes. Both leave a row at candidate_active, and they
 # mean opposite things -- so they are first-class values, never a shared
 # None:
 #
-#   no_match               the seller publishes legal details and none match
-#                          the source. Evidence AGAINST first-party ownership.
+#   no_match               the seller publishes legal details, none match the
+#                          source, AND no email at the source's domain.
+#                          Evidence against first-party ownership -- but see
+#                          the itinstock case above: an identifier mismatch
+#                          ALONE is weak, because marketplace channels are
+#                          routinely run under a different legal entity.
 #   legal_info_unavailable no legal block on any sampled listing. Says
 #                          nothing about ownership; says the experiment had
 #                          no resolving power here.
@@ -171,7 +194,9 @@ def extract(item):
     """
     seller = (item or {}).get("seller") or {}
     legal = seller.get("sellerLegalInfo") or {}
-    addr = legal.get("legalAddress") or {}
+    # eBay returns either key depending on marketplace and account
+    addr = (legal.get("legalAddress") or
+            legal.get("sellerProvidedLegalAddress") or {})
     vat = ""
     details = legal.get("vatDetails") or []
     if isinstance(details, dict):
@@ -184,9 +209,37 @@ def extract(item):
         "registrationNumber": legal.get("registrationNumber") or "",
         "vat": vat,
         "postcode": addr.get("postalCode") or "",
+        "email": (legal.get("email") or "").strip().lower(),
         "account_type": seller.get("sellerAccountType") or "",
         "username": seller.get("username") or "",
     }
+
+
+def email_domain_match(email, domain):
+    """
+    True when a seller's legal contact email is at the source's own domain.
+
+    'ebay@itinstock.com' vs 'www.itinstock.com' -> True. Subdomains and the
+    www prefix are stripped from both sides; a bare public mailbox
+    (gmail, outlook, ...) never matches.
+    """
+    if not email or "@" not in str(email) or not domain:
+        return False
+    host = str(email).rsplit("@", 1)[1].strip().lower().rstrip(".")
+    dom = re.sub(r"^www\.", "", str(domain).strip().lower()).split("/")[0]
+    if not host or not dom:
+        return False
+    if host in _PUBLIC_MAIL:
+        return False
+    return host == dom or host.endswith("." + dom) or dom.endswith("." + host)
+
+
+_PUBLIC_MAIL = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
+    "yahoo.com", "yahoo.co.uk", "icloud.com", "aol.com", "protonmail.com",
+    "btinternet.com", "sky.com", "msn.com", "me.com", "mail.com",
+    "ebay.com", "ebay.co.uk",
+}
 
 
 def evaluate(observed, expected):
@@ -204,6 +257,11 @@ def evaluate(observed, expected):
     """
     if not observed or not observed.get("available"):
         return UNAVAILABLE, "no legal block published on this listing"
+
+    if email_domain_match(observed.get("email"), expected.get("domain")):
+        return "email_domain", (
+            f"legal contact email {observed['email']} is at the source's own "
+            f"domain")
 
     if company_match(observed.get("registrationNumber"),
                      expected.get("registrationNumber")):

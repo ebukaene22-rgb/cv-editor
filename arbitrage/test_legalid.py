@@ -201,3 +201,46 @@ class Denominators(unittest.TestCase):
         r = legalid.resolving_power([])
         self.assertIsNone(r["power"])
         self.assertIsNone(r["coverage"])
+
+
+class EmailDomain(unittest.TestCase):
+    """The itinstock gate: entity mismatch, but the email is at the domain."""
+
+    REAL = {"seller": {"username": "itinstock", "sellerAccountType": "BUSINESS",
+                       "sellerLegalInfo": {
+                           "name": "Russell Jackson",
+                           "sellerProvidedLegalAddress": {
+                               "addressLine1": "32 Bloomsbury Street",
+                               "postalCode": "WC1B 3QJ", "country": "GB"},
+                           "email": "ebay@itinstock.com",
+                           "vatDetails": [{"vatId": "788005803"}]}}}
+    EXPECT = dict(ITINSTOCK, domain="www.itinstock.com")
+
+    def test_domain_email_confirms_despite_entity_mismatch(self):
+        obs = legalid.extract(self.REAL)
+        tier, why = legalid.evaluate(obs, self.EXPECT)
+        self.assertEqual(tier, "email_domain")
+        self.assertTrue(legalid.is_confirming(tier), why)
+
+    def test_without_the_email_tier_it_would_read_as_no_match(self):
+        # the exact false negative this tier exists to prevent
+        obs = legalid.extract(self.REAL)
+        tier, _ = legalid.evaluate(obs, ITINSTOCK)   # no domain supplied
+        self.assertEqual(tier, legalid.NO_MATCH)
+
+    def test_seller_provided_address_key_is_read(self):
+        obs = legalid.extract(self.REAL)
+        self.assertEqual(obs["postcode"], "WC1B 3QJ")
+
+    def test_public_mailbox_never_confirms(self):
+        item = {"seller": {"sellerLegalInfo": {
+            "name": "x", "email": "itinstock@gmail.com"}}}
+        tier, _ = legalid.evaluate(legalid.extract(item), self.EXPECT)
+        self.assertNotEqual(tier, "email_domain")
+
+    def test_registration_still_outranks_nothing_but_email_is_top(self):
+        self.assertEqual(legalid.TIERS[0], "email_domain")
+        for t in ("email_domain", "registration", "vat"):
+            self.assertTrue(legalid.is_confirming(t))
+        for t in ("name_address", "name"):
+            self.assertFalse(legalid.is_confirming(t))
